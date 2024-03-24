@@ -20,6 +20,8 @@ jobs:
     name: Build DITA
     # jobs作业将运行的runner运行器类型
     runs-on: ubuntu-latest
+    environment: 
+      name: statcrypt
     # steps步骤表示将作为作业的一部分执行的一系列任务
     steps:
       # 第1步是获取源码，
@@ -125,16 +127,23 @@ jobs:
 #      run:  sudo apt-get install rsync && rsync -arv out/ CNAME output/
       - name: Encrypt index
 #        run:  staticrypt out/html5/01基础知识/ditas/* -r -d out/html5/01基础知识/ditas
-#        run:  find ./out/html5/01基础知识/ditas -type f -name "*.html" -exec staticrypt {} -p STATICRYPT_PASSWORD -o ./output/html5/01基础知识/ditas/{}  \;
-        run: staticrypt main.html -p 1234567 --short -f password_template/template.html -o index.html
-
+#        run:  find ./out/html5/01基础知识/ditas -type f -name "*.html" -exec staticrypt {} -p STATICRYPT_PASSWORD -o ./output/html5/01基础知识/ditas/{}"/.."  \;
+#        run: staticrypt main.html -p 1234567 --short -f password_template/template.html -o index.html
+#          find ./html5/01基础知识/ditas -type f -name "*.html" -exec staticrypt {} -p 1234567 --short -d ./output/{} -f password_template/template.html \;
+#          staticrypt ./html5/01基础知识/ditas/Css.html -p 1234567 --short -d ./output
+        run: |
+          mkdir -p output/html5/01基础知识/ditas
+          rsync -av -f"+ */" -f"- *" html5 output
+          rsync -r --exclude="*.html" html5 output
+          find ./html5 -type f -name "*.html" -exec staticrypt {} -p ${{ secrets.STATICRYPT_PASSWORD }} --short -d ./output/$(dirname ${}) -f password_template/template.html \;
+          ls -R
       - name: Pushes to another repository
         uses: cpina/github-action-push-to-another-repository@main
         env:
           SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
           API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
         with:
-          source-directory: 'encrypted'
+          source-directory: 'output'
           destination-github-username: 'dragoncqh'
           destination-repository-name: 'staticrypt-github-actions2024'
           user-email: dragoncqh@gmail.com
