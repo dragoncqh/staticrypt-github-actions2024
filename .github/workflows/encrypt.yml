@@ -1,32 +1,142 @@
-name: Manual workflow
-
-on:
+# Actions基本工作流程注释#整个流程在master分支发生push事件时触发。
+name: CI_main
+# 控制工作流何时运行
+'on':
+  # 在推送或拉取请求事件上触发工作流程，但仅限于“main”分支
   push:
-    branches: [ main ]
+    branches: ["main"]
   pull_request:
-    branches: [ main ]
-
+    branches: ["main"]
+  # 允许您从“操作”选项卡手动运行此工作流程
+  workflow_dispatch:
+# 环境变量设置
+env:
+  DEBIAN_FRONTEND: noninteractive
+  DEBCONF_NOWARNINGS: "yes"
+# 工作流程运行由一个或多个可以顺序或并行运行的作业组成
 jobs:
-  crypt:
-    # The type of runner that the job will run on
+  # 该工作流程包含一个名为“build-dita”的作业
+  build-dita:
+    name: Build DITA
+    # jobs作业将运行的runner运行器类型
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    # steps步骤表示将作为作业的一部分执行的一系列任务
     steps:
-    - uses: actions/checkout@v2
-    - name: Install staticrypt
-      run: sudo npm install -g staticrypt
-    - name: Encrypt index
-      run: staticrypt main.html -p 1234567 --short -f password_template/template.html -o index.html
-    - name: Pushes to another repository
-      uses: cpina/github-action-push-to-another-repository@main
-      env:
-        SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
-        API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        source-directory: 'encrypted'
-        destination-github-username: 'dragoncqh'
-        destination-repository-name: 'staticrypt-github-actions2024'
-        user-email: dragoncqh@gmail.com
-        target-branch: gh-pages
+      # 第1步是获取源码，
+      - name: Git checkout
+        # 使用的 action 是actions/checkout。在 $GITHUB_WORKSPACE 下签出存储库;
+        uses: actions/checkout@v3
+        
+#      # 第2步是构建HTML5
+#      - name: Build HTML5 using DITA-OT
+#        uses: dita-ot/dita-ot-action@master
+#        with:
+#          plugins : |
+#              https://github.com/jason-fox/fox.jason.extend.css/archive/master.zip
+#              org.jung.xmltask
+#              com.oxygenxml.json.dita
+#          input: 工程师手册.ditamap
+#          transtype: html5
+#          output-path: out 
+          
+#      # 第2步是构建HTML5 + Bootstrap
+#      - name: Build HTML5 + Bootstrap
+#        uses: dita-ot/dita-ot-action@master
+#        with:
+#          install: |
+#              apt-get update -q
+#              export DEBIAN_FRONTEND=noninteractive
+#              apt-get install -qy --no-install-recommends nodejs
+#              nodejs -v
+#          plugins : |
+#            fox.jason.extend.css
+#            net.infotexture.dita-bootstrap
+#            net.infotexture.dita-bootstrap.lunr 
+#          input: 工程师手册.ditamap
+#          transtype: html5-bootstrap
+#          output-path: out 
+
+#      # 第3步是构建和部署，名称：构建 PDF
+#      - name: Build PDF
+#        uses: dita-ot/dita-ot-action@master
+#        with:
+#          input: hierarchy.ditamap
+#          transtype: pdf
+#         output-path: out
+#            install: |
+#            # 可运行指定安装命令
+#            apt-get update -q
+#            apt-get install -qy --no-install-recommends nodejs
+#            apt-get install -qy --no-install-recommends apt-utils
+#            nodejs -v
+#
+#            # 安装插件
+#            dita install fox.jason.extend.css
+#            dita --install https://github.com/doctales/org.doctales.xmltask/archive/master.zip
+#            dita install fox.jason.prismjs
+#          build: |
+#            # 运行dita命令行
+#            dita -i taskbook.ditamap -o out -f pdf
+
+#      # 第4步：上传文件或目录为ZIP文件，可供其他job下载
+#      - name: Upload DITA Output to a ZIP file
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: dita-artifact
+#          path: 'out'
+
+#      # 第5步：自动部署网站内容
+#      - name: Deploy DITA Output to GitHub Pages
+#        uses: JamesIves/github-pages-deploy-action@3.7.1
+#        with:
+#          # 第5步需要3个环境变量，变量1：GitHub密钥是加密变量，使用双括号调用环境变量
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          # 变量2：发布分支
+#          BRANCH: gh-pages # The branch the action should deploy to.
+#          # 变量3：构建成果所在目录
+#          FOLDER: out # The folder the action should deploy.
+
+#      # 第5步：部署网站内容
+#      - name: Deploy
+#        uses: peaceiris/actions-gh-pages@v3
+#        with:
+#          github_token: ${{ secrets.GITHUB_TOKEN }}
+#          publish_dir: out
+
+#      # 第5步：部署网站内容
+#      - name: Copy output_temp/ to output/ using rsync (to exclude main.epub in this example)
+#        run:  sudo apt-get install rsync && rsync -arv out/ index.html CNAME output/
+#      - name: Pushes to another repository
+#        uses: cpina/github-action-push-to-another-repository@main
+#        env:
+#          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+#          API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          source-directory: 'output'
+#          destination-github-username: 'dragoncqh'
+#          destination-repository-name: 'StrivingWiki'
+#          user-email: dragoncqh@gmail.com
+#          target-branch: gh-pages
+      
+      # 第5步：部署网站内容
+      - name: Install staticrypt
+        run:  sudo npm install -g staticrypt
+#    - name: Copy out/ to output/ using rsync (to exclude main.epub in this example)
+#      run:  sudo apt-get install rsync && rsync -arv out/ CNAME output/
+      - name: Encrypt index
+#        run:  staticrypt out/html5/01基础知识/ditas/* -r -d out/html5/01基础知识/ditas
+#        run:  find ./out/html5/01基础知识/ditas -type f -name "*.html" -exec staticrypt {} -p STATICRYPT_PASSWORD -o ./output/html5/01基础知识/ditas/{}  \;
+        run: staticrypt main.html -p 1234567 --short -f password_template/template.html -o index.html
+
+      - name: Pushes to another repository
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+          API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          source-directory: 'encrypted'
+          destination-github-username: 'dragoncqh'
+          destination-repository-name: 'staticrypt-github-actions2024'
+          user-email: dragoncqh@gmail.com
+          target-branch: gh-pages
         
