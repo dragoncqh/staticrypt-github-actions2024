@@ -1,0 +1,171 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>Session会话</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="Session会话-5E0D8E9A"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">Session会话</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">11 会话</h2><p class="p">会话是应用程序的工作单元，它可以包含多个数据库事务。在这个ODB版本中，会话只是一个对象缓存。在未来的版本中，它可能提供额外的功能，如延迟数据库操作和自动对象状态更改跟踪。正如11.2节“自定义会话”后面所讨论的，也可以提供一个自定义会话实现来提供这些或其他特性 </p><p class="p">Session support is optional and can be enabled or disabled on
+the per object basis using the db session pragma, for example:</p><p class="p">&nbsp;会话支持是可选的，在每个对象的基础上使用db session pragma可以启用或禁用，例如:</p><p class="p">#pragma
+db object session</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">We can also enable or disable session support for a group
+of objects at the namespace level:</p><p class="p">我们还可以在命名空间级别启用或禁用对一组对象的会话支持:</p><p class="p">#pragma db namespace session</p><p class="p">namespace accounting</p><p class="p">{</p><p class="p">&nbsp; #pragma db object&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Session support is enabled.</p><p class="p">&nbsp; class employee</p><p class="p">&nbsp;
+{</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp; };</p><p class="p">&nbsp; #pragma
+db object session(false) // Session support is disabled.</p><p class="p">&nbsp;
+class employer</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;
+};</p><p class="p">}</p><p class="p">Finally, we can pass the --generate-session ODB compiler
+option to enable session support by default. With this option session
+support will be enabled for all the persistent classes except those
+for which it was explicitly disabled using the db session. An alternative
+to this method with the same effect is to enable session support for
+the global namespace:</p><p class="p">最后，我们可以传递——generate-session ODB编译器选项，默认情况下启用会话支持。有了这个选项，会话支持将对所有持久类启用，除了那些使用db
+session 显式禁用的类。另一个具有相同效果的方法是启用全局命名空间的会话支持:</p><p class="p">#pragma db namespace()
+session</p><p class="p">Each thread of execution in an application can have
+only one active session at a time. A session is started by creating
+an instance of the odb::session class and is automatically terminated
+when this instance is destroyed. You will need to include the &lt;odb/session.hxx&gt;
+header file to make this class available in your application. For
+example:</p><p class="p">应用程序中的每个执行线程在同一时间只能有一个活动会话。会话是通过创建odb::session类的一个实例来启动的，当这个实例被销毁时，会话将自动终止。您将需要包括&lt;odb/session.hxx&gt;使该类在应用程序中可用的头文件。例如:</p><p class="p">#include &lt;odb/database.hxx&gt;</p><p class="p">#include &lt;odb/session.hxx&gt;</p><p class="p">#include &lt;odb/transaction.hxx&gt;</p><p class="p">using namespace odb::core;</p><p class="p">{</p><p class="p">&nbsp; session s;</p><p class="p">&nbsp; // First transaction.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;&nbsp;&nbsp;
+t.commit ();</p><p class="p">&nbsp; }</p><p class="p">&nbsp; // Second transaction.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;&nbsp;&nbsp;
+t.commit ();</p><p class="p">&nbsp; }</p><p class="p">&nbsp; // Session 's' is terminated
+here.</p><p class="p">}</p><p class="p">&nbsp; </p><p class="p">The session class has the following
+interface:</p><p class="p">session类有以下接口:</p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; class session</p><p class="p">&nbsp; {</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp;
+session (bool make_current = true);</p><p class="p">&nbsp;&nbsp;&nbsp; ~session
+();</p><p class="p">&nbsp;&nbsp;&nbsp; // Copying or assignment of sessions
+is not supported.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp; private:</p><p class="p">&nbsp;&nbsp;&nbsp; session (const session&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+session&amp; operator= (const session&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+// Current session interface.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;
+public:</p><p class="p">&nbsp;&nbsp;&nbsp; static session&amp;</p><p class="p">&nbsp;&nbsp;&nbsp;
+current ();</p><p class="p">&nbsp;&nbsp;&nbsp; static bool</p><p class="p">&nbsp;&nbsp;&nbsp;
+has_current ();</p><p class="p">&nbsp;&nbsp;&nbsp; static void</p><p class="p">&nbsp;&nbsp;&nbsp;
+current (session&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; static void</p><p class="p">&nbsp;&nbsp;&nbsp; reset_current ();</p><p class="p">&nbsp;&nbsp;&nbsp; static
+session*</p><p class="p">&nbsp;&nbsp;&nbsp; current_pointer ();</p><p class="p">&nbsp;&nbsp;&nbsp;
+static void</p><p class="p">&nbsp;&nbsp;&nbsp; current_pointer (session*);</p><p class="p">&nbsp;&nbsp;&nbsp; // Object cache interface.</p><p class="p">&nbsp;&nbsp;&nbsp;
+//</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp; template &lt;typename
+T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp; struct cache_position {...};</p><p class="p">&nbsp;&nbsp;&nbsp;
+template &lt;typename T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp; cache_position&lt;T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp; cache_insert (database&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const object_traits&lt;T&gt;::id_type&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const object_traits&lt;T&gt;::pointer_type&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+template &lt;typename T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp; object_traits&lt;T&gt;::pointer_type</p><p class="p">&nbsp;&nbsp;&nbsp; cache_find (database&amp;, const object_traits&lt;T&gt;::id_type&amp;)
+const;</p><p class="p">&nbsp;&nbsp;&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp;
+void</p><p class="p">&nbsp;&nbsp;&nbsp; cache_erase (const cache_position&lt;T&gt;&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp;&nbsp;&nbsp;
+void</p><p class="p">&nbsp;&nbsp;&nbsp; cache_erase (database&amp;, const object_traits&lt;T&gt;::id_type&amp;);</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p">The session constructor creates a new
+session and, if the make_current argument is true, sets it as a current
+session for this thread. If we try to make a session current while
+there is already another session in effect for this thread, then the
+constructor throws the odb::already_in_session exception. The destructor
+clears the current session for this thread if this session is the
+current one.</p><p class="p">会话构造函数创建一个新会话，如果make_current参数为true，则将其设置为该线程的当前会话。如果尝试将一个会话设置为当前会话，而此时已经有另一个会话对该线程生效，则构造函数将抛出odb::already_in_session异常。如果此会话是当前会话，则析构函数将清除此线程的当前会话。 </p><p class="p">The static current() accessor returns the currently active session
+for this thread. If there is no active session, this function throws
+the odb::not_in_session exception. We can check whether there is a
+session in effect in this thread using the has_current() static function.</p><p class="p">静态current()访问器返回该线程当前活动的会话。如果没有活动会话，这个函数抛出odb::not_in_session异常。我们可以使用has_current()静态函数检查该线程中是否有会话生效。 </p><p class="p">The static current() modifier allows us to set the current session
+for this thread. The reset_current() static function clears the current
+session. These two functions allow for more advanced use cases, such
+as multiplexing two or more sessions on the same thread.</p><p class="p">静态current()修饰符允许我们为这个线程设置当前会话。reset_current()静态函数的作用是:清除当前会话。这两个函数允许更高级的用例，例如在同一个线程上复用两个或多个会话。 </p><p class="p">The static current_pointer() overloaded functions provided the
+same functionality but using pointers. Specifically, the current_pointer()
+accessor can be used to test whether there is a current session and
+get a pointer to it all with a single call.</p><p class="p">静态的current_pointer()重载函数提供了相同的功能，但使用了指针。具体来说，可以使用current_pointer()访问器来测试是否存在当前会话，并通过一次调用获得指向该会话的指针。 </p><p class="p">We normally don't use the object cache interface directly. However,
+it could be useful in some cases, for example, to find out whether
+an object has already been loaded. Note that when calling cache_insert(),
+cache_find(), or the second version of cache_erase(), you need to
+specify the template argument (object type) explicitly. It is also
+possible to access the underlying cache data structures directly.
+This can be useful if, for example, you want to iterate over the objects
+store in the cache. Refer to the ODB runtime header files for more
+details on this direct access.</p><p class="p">我们通常不直接使用对象缓存接口。但是，在某些情况下，它可能会很有用，例如，它可以发现一个对象是否已经被加载。请注意，当调用cache_insert()、cache_find()或第二个版本的cache_erase()时，需要显式地指定模板参数(对象类型)。也可以直接访问底层缓存数据结构。例如，如果您想要迭代存储在缓存中的对象，这可能很有用。有关此直接访问的详细信息，请参阅ODB运行时头文件。</p><p class="p">&nbsp;</p><p class="p">11.1 Object Cache&nbsp;&nbsp; 对象缓存</p><p class="p">A session
+is an object cache. Every time a session-enabled object is made persistent
+by calling the database::persist() function (Section 3.8, "Making
+Objects Persistent"), loaded by calling the database::load() or database::find()
+function (Section 3.9, "Loading Persistent Objects"), or loaded by
+iterating over a query result (Section 4.4, "Query Result"), the pointer
+to the persistent object, in the form of the canonical object pointer
+(Section 3.3, "Object and View Pointers"), is stored in the session.
+For as long as the session is in effect, any subsequent calls to load
+the same object will return the cached instance. When an object's
+state is deleted from the database with the database::erase() function
+(Section 3.11, "Deleting Persistent Objects"), the cached object pointer
+is removed from the session. For example:</p><p class="p">会话是一个对象缓存。每次session-enabled对象是由持久通过调用database::persist()函数(3.8节,“使对象持久”),通过调用database::load()或database::find()函数(3.9节,“加载持久对象”),或加载通过遍历查询结果(4.4节,“查询结果”),指向持久对象的指针，以规范对象指针的形式(第3.3节，“对象和视图指针”)存储在会话中。只要会话有效，任何加载相同对象的后续调用都将返回缓存的实例。当一个对象的状态通过database::erase()函数(章节3.11，“删除持久化对象”)从数据库中删除时，缓存的对象指针将从会话中删除。例如:</p><p class="p">shared_ptr&lt;person&gt; p (new person ("John", "Doe"));</p><p class="p">session
+s;</p><p class="p">transaction t (db.begin ());</p><p class="p">unsigned long id (db.persist
+(p));&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// p is cached in s.</p><p class="p">shared_ptr&lt;person&gt; p1 (db.load&lt;person&gt;
+(id)); // p1 same as p.</p><p class="p">t.commit ();</p><p class="p">The per-object caching
+policies depend on the object pointer kind (Section 6.5, "Using Custom
+Smart Pointers"). Objects with a unique pointer, such as std::auto_ptr
+or std::unique_ptr, as an object pointer are never cached since it
+is not possible to have two such pointers pointing to the same object.
+When an object is persisted via a pointer or loaded as a dynamically
+allocated instance, objects with both raw and shared pointers as object
+pointers are cached. If an object is persisted as a reference or loaded
+into a pre-allocated instance, the object is only cached if its object
+pointer is a raw pointer.</p><p class="p">每个对象的缓存策略依赖于对象指针类型(第6.5节，“使用自定义智能指针”)。具有唯一指针的对象，如std::auto_ptr或std::unique_ptr，作为对象指针永远不会被缓存，因为不可能有两个这样的指针指向同一个对象。当一个对象通过一个指针被持久化或作为一个动态分配的实例被加载时，带有原始指针和共享指针的对象被缓存。如果一个对象被持久化为一个引用或者被加载到一个预先分配的实例中，那么只有当它的对象指针是一个原始指针时，这个对象才会被缓存。 </p><p class="p">Also note that when we persist an object as a constant reference
+or constant pointer, the session caches such an object as unrestricted
+(non-const). This can lead to undefined behavior if the object being
+persisted was actually created as const and is later found in the
+session cache and used as non-const. As a result, when using sessions,
+it is recommended that all persistent objects be created as non-const
+instances. The following code fragment illustrates this point:</p><p class="p">还要注意，当将对象持久化为常量引用或常量指针时，会话将这样的对象缓存为unrestricted(非const)对象。如果持久化的对象实际上是作为const创建的，并且后来在会话缓存中找到并作为非const使用，那么这可能会导致未定义的行为。因此，在使用会话时，建议将所有持久化对象创建为非const实例。下面的代码片段说明了这一点:</p><p class="p">void save (database&amp; db, shared_ptr&lt;const person&gt; p)</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.persist
+(p); // Persisted as const pointer.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">session s;</p><p class="p">shared_ptr&lt;const person&gt; p1 (new const
+person ("John", "Doe"));</p><p class="p">unsigned long id1 (save (db, p1));
+// p1 is cached in s as non-const.</p><p class="p">{</p><p class="p">&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp; shared_ptr&lt;person&gt; p (db.load&lt;person&gt;
+(id1)); // p == p1</p><p class="p">&nbsp; p-&gt;age (30); // Undefined behavior
+since p1 was created const.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">shared_ptr&lt;const person&gt; p2 (new person ("Jane", "Doe"));</p><p class="p">unsigned long id2 (save (db, p2)); // p2 is cached in s as non-const.</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; shared_ptr&lt;person&gt;
+p (db.load&lt;person&gt; (id2)); // p == p2</p><p class="p">&nbsp; p-&gt;age (30);
+// Ok, since p2 was not created const.</p><p class="p">&nbsp; t.co</p><p class="p">&nbsp;</p><p class="p">11.2 Custom Sessions&nbsp; 自定义会话</p><p class="p">ODB can use a custom session
+implementation instead of the default odb::session. There could be
+multiple reasons for an application to provide its own session. For
+example, the application may already include a notion of an object
+cache or registry which ODB can re-use. A custom session can also
+provide additional functionality, such as automatic change tracking,
+delayed database operations, or object eviction. Finally, the session-per-thread
+approach used by odb::session may not be suitable for all applications.
+For instance, some may need a thread-safe session that can be shared
+among multiple threads. For an example of a custom session that implements
+automatic change tracking by keeping original copies of the objects,
+refer to the common/session/custom test in the odb-tests package.</p><p class="p">ODB可以使用自定义的会话实现，而不是默认的ODB::session。应用程序提供自己的会话可能有多种原因。例如，应用程序可能已经包含ODB可以重用的对象缓存或注册表的概念。定制会话还可以提供其他功能，如自动更改跟踪、延迟的数据库操作或对象回收。最后，odb::session使用的每线程会话的方法可能不适用于所有应用程序。例如，有些可能需要一个可以在多个线程之间共享的线程安全会话。关于通过保存对象的原始副本来实现自动更改跟踪的定制会话示例，请参阅odb-tests包中的公共/会话/定制测试。 </p><p class="p">To use a custom session we need to specify its type with the --session-type
+ODB compiler command line option. We also need to include its definition
+into the generated header file. This can be achieved with the --hxx-prologue
+option. For example, if our custom session is called app::session
+and is defined in the app/session.hxx header file, then the corresponding
+ODB compiler options would look like this:</p><p class="p">要使用自定义会话，我们需要使用 --session-type
+ODB编译器命令行选项指定它的类型。我们还需要在生成的头文件中包含它的定义。这可以通过——hxx-prologue选项实现。例如，如果我们的自定义会话名为app::session，并且在app/session中定义。hxx头文件，则对应的ODB编译器选项如下所示:</p><p class="p">odb --hxx-prologue "#include \"app/session.hxx\"" \</p><p class="p">--session-type
+::app::session ...</p><p class="p">A custom session should provide the following
+interface:</p><p class="p">一个自定义会话应该提供以下接口:</p><p class="p">class custom_session</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp;
+struct cache_position</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp; };</p><p class="p">&nbsp; // Cache management functions.</p><p class="p">&nbsp;
+//</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; static cache_position&lt;T&gt;</p><p class="p">&nbsp; _cache_insert (odb::database&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const typename odb::object_traits&lt;T&gt;::id_type&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const typename odb::object_traits&lt;T&gt;::pointer_type&amp;);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; static typename odb::object_traits&lt;T&gt;::pointer_type</p><p class="p">&nbsp; _cache_find (odb::database&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const typename odb::object_traits&lt;T&gt;::id_type&amp;);</p><p class="p">&nbsp;
+template &lt;typename T&gt;</p><p class="p">&nbsp; static void</p><p class="p">&nbsp; _cache_erase
+(const cache_position&lt;T&gt;&amp;);</p><p class="p">&nbsp; // Notification functions.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; static
+void</p><p class="p">&nbsp; _cache_persist (const cache_position&lt;T&gt;&amp;);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; static void</p><p class="p">&nbsp; _cache_load (const cache_position&lt;T&gt;&amp;);</p><p class="p">&nbsp;
+template &lt;typename T&gt;</p><p class="p">&nbsp; static void</p><p class="p">&nbsp; _cache_update
+(odb::database&amp;, const T&amp; obj);</p><p class="p">&nbsp; template &lt;typename
+T&gt;</p><p class="p">&nbsp; static void</p><p class="p">&nbsp; _cache_erase (odb::database&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const typename odb::object_traits&lt;T&gt;::id_type&amp;);</p><p class="p">};</p><p class="p">The cache_position class template represents a position in the
+cache of the inserted object. It should be default and copy-constructible
+as well as copy-assignable. The default constructor shall create a
+special empty/NULL position. A call of any of the cache management
+or notification functions with such an empty/NULL position shall be
+ignored.</p><p class="p">cache_position类模板表示插入对象在缓存中的位置。它应该是默认的、可复制构造的以及可复制赋值的。默认构造函数应该创建一个特殊的空/空位置。任何缓存管理或通知函数的调用带有这样的空/NULL位置都将被忽略。 </p><p class="p">The _cache_insert() function shall add the object into the object
+cache and return its position. The _cache_find() function looks an
+object up in the object cache given its id. It returns a NULL pointer
+if the object is not found. The _cache_erase() cache management function
+shall remove the object from the cache. It is called if the database
+operation that caused the object to be inserted (for example, load)
+failed. Note also that after insertion the object state is undefined.
+You can only access the object state (for example, make a copy or
+clear a flag) from one of the notification functions discussed below.</p><p class="p">_cache_insert()函数应该将对象添加到对象缓存中并返回其位置。_cache_find()函数在对象缓存中查找给定id的对象。如果对象没有找到，它返回一个NULL指针。_cache_erase()缓存管理函数应该将对象从缓存中移除。如果导致对象插入(例如，加载)的数据库操作失败，则调用该函数。还要注意，在插入之后，对象状态是未定义的。您只能从下面讨论的通知函数之一访问对象状态(例如，复制或清除标志)。 </p><p class="p">The notification functions are called after an object has been
+persisted, loaded, updated, or erased, respectively. If your session
+implementation does not need some of the notifications, you still
+have to provide their functions, however, you can leave their implementations
+empty.</p><p class="p">通知函数分别在对象被持久化、加载、更新或擦除之后被调用。如果您的会话实现不需要一些通知，您仍然必须提供它们的功能，但是，您可以保留它们的实现为空。 </p><p class="p">Notice also that all the cache management and notification functions
+are static. This is done in order to allow for a custom notion of
+a current session. Normally, the first step a non-empty implementation
+will perform is lookup the current session.</p><p class="p">还要注意，所有缓存管理和通知功能都是静态的。这样做是为了允许当前会话的自定义概念。通常，非空实现将执行的第一步是查找当前会话。</p></section>
+<section class="section"><h2 class="title sectiontitle">11.1 对象缓存</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">11.2 自定义会话</h2><p class="p"></p></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>

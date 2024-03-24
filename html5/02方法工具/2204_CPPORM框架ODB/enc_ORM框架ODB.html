@@ -1,0 +1,960 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>ORM框架ODB简介</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="ORM框架ODB-5A5BC595"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">ORM框架ODB简介</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">前言</h2><p class="p">软件系统经常需要把数据存入持久且可靠的数据库中。主流的成熟可靠的关系数据库管理系统(RDBMS)一直使用关系模型技术，所以和许多现代应用程序使用的面向对象模型就非常不匹配。</p><p class="p">为了允许应用程序开发人员从他们的面向对象应用程序中使用关系数据库，经常使用自动化对象关系映射(ORM)的技术。</p><p class="p">ODB 是 C++ 的 ORM 系统。它的设计和实施具有以下主要目标：</p><ol class="ol">
+<li class="li"><p class="p">提供全自动的ORM系统。特别是，应用程序开发人员不必手动编写任何映射代码，无论是为持久类还是为它们的数据成员。</p></li>
+<li class="li"><p class="p">提供干净且易于使用的面向对象的持久性模型和数据库 API，支持为各种领域开发实际应用程序。</p></li>
+<li class="li"><p class="p">提供可移植和线程安全的实现。 ODB 应该用标准 C++ 编写并且能够持久化任何标准 C++ 类。</p></li>
+<li class="li"><p class="p">提供将 ODB 与广泛使用的框架和库(如 Qt 和 Boost)的类型系统集成的配置文件。</p></li>
+<li class="li"><p class="p">提供高性能和低开销的实现。 ODB 应有效利用数据库和应用程序资源。</p></li>
+</ol></section>
+<section class="section"><h2 class="title sectiontitle">关于本文档</h2><p class="p">本手册的目的是让您了解 ODB 实现的对象持久性模型和 API。因此，本文档适用于正在寻找
+C++ 对象持久性解决方案的 C++ 应用程序开发人员和软件架构师。要理解本文档，需要具备 C++ 方面的经验,最好有关系数据库系统有基本了解。</p></section>
+<section class="section"><h2 class="title sectiontitle">更多文档信息</h2><p class="p">除了本手册之外，您还可能会发现以下有用的信息来源：</p><p class="p">ODB
+编译器命令行手册。</p><p class="p">ODB 源包中的 INSTALL 文件为各种平台提供构建说明。</p><p class="p">odb-examples
+包包含示例集合和包含每个示例概述的 README 文件。</p><p class="p">odb-users 邮件列表是询问有关 ODB 的技术问题的地方。此外，可搜索的档案可能已经回答了您的一些问题。</p></section>
+<section class="section"><h2 class="title sectiontitle">第一部分 对象关系映射</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">1 简介</h2><ol class="ol">
+<li class="li"><p class="p">ODB是C++的一个对象-关系映射(ORM)系统。它提供了工具、API和库支持，允许您将C++对象持久化到关系数据库(RDBMS)，而无需处理表、列或SQL，也无需手工编写任何映射代码。</p></li>
+<li class="li"><p class="p">ODB是非常灵活和可定制的。它可以完全隐藏底层数据库的关系性质，也可以根据需要公开一些细节。例如，您可以自动将基本C++类型映射到合适的SQL类型，为持久类生成关系数据库模型，并使用简单、安全但功能强大的对象查询语言来代替SQL。或者，您可以为单个数据成员分配SQL类型，使用现有的数据库模型，运行本机SQL
+SELECT查询，并调用存储过程。实际上，在极端情况下，ODB可以作为一种方便的方式来处理本机SQL查询的结果。</p></li>
+<li class="li"><p class="p">ODB不是一个框架。它并没有规定你应该如何编写你的应用程序。相反，它通过只处理对象持久性而不干扰任何其他功能来适应您的风格和体系结构。不存在所有持久类都应该派生的通用基类型，也不存在对持久类中的数据成员类型的任何限制。现有的类可以通过少量修改或不修改而实现持久性。</p></li>
+<li class="li"><p class="p">ODB被设计为高性能和低内存开销。准备好的语句用于发送和接收二进制格式的对象状态，而不是文本格式，这减少了应用程序和数据库服务器上的负载。对连接、准备好的语句和缓冲区进行大量缓存可以节省建立连接、语句解析和内存分配的时间和资源。对于每个受支持的数据库系统，使用本机C
+API而不是ODBC或更高级别的包装器API来减少开销，并为每个数据库操作提供最有效的实现。最后，持久化类的内存开销为零，没有每个类必须拥有的隐藏“数据库”成员，也没有ODB分配的每个对象数据结构。</p></li>
+</ol><p class="p">在这一章中，我们将对ODB进行高层次的概述。我们将从ODB体系结构开始，然后概述使用ODB构建应用程序的工作流程。我们将继续对比将C++对象保存到关系数据库的传统方法的缺点和使用ODB实现对象持久性的优点。我们通过讨论ODB支持的C++标准来结束本章。下一章将采用更实际的方法，展示在一个简单的“Hello
+World”应用程序中实现对象持久性所需的具体步骤。</p><p class="p">ODB是应用于C++的一个开源、跨平台、跨数据库的对象关系映射(ORM)系统。</p><p class="p">它可以让你持久化C++对象到关系数据库，而不必处理表、列或者SQL，无需手动编写任何映射代码。</p><p class="p">ODB支持MySQL，SQLite，PostgreSQL，Oracle和微软SQL
+Server关系数据库以及C ++98/03和C ++11语言标准。</p><p class="p">它还配备了用于Boost和Qt可选的配置文件，让你可以无缝地使用这些库持久化C++类的值类型、容器和智能指针。</p><p class="p">它有易用性，简洁的代码，安全，数据库可移植性，优良的性能，可维护性等优点。</p><p class="p">总之它具有完善的学习文档的非常棒的C++的ORM框架。</p></section>
+<section class="section"><h2 class="title sectiontitle">1.1 架构和工作流程</h2><p class="p">从应用程序开发人员的角度来看，ODB由三个主要组件组成
+: ODB编译器、公共运行时库(称为libodb)和特定于数据库的运行时库(称为libodb-&lt;dat abase&gt;)，其中&lt;database&gt;是该运行时所针对的数据库系统的名称，例如:
+libodb-mysql。例如，如果应用程序将使用MySQL数据库进行对象持久性，那么该应用程序将使用的三个ODB组件是ODB编译器、libodb
+和 libodb-mysql。&nbsp;&nbsp;&nbsp;&nbsp; </p><p class="p">ODB编译器为应用程序中的持久类生成数据库支持代码。ODB编译器的输入是一个或多个C++头文件，这些头文件定义了希望持久使用的C++类。对于每个输入头文件，ODB编译器生成一组C++源文件，实现在这个头文件中定义的持久C++类及其数据库表示之间的转换。ODB编译器还可以生成一个数据库模型文件，该文件创建存储持久类所需的表。</p><p class="p">ODB编译器是一个真正的C++编译器，只不过它生成的是C++而不是汇编代码或机器码。特别地，它不是一个只能够识别C++子集的特别头预处理器。ODB能够解析任何标准C++代码。公共运行时库定义了独立于数据库系统的接口，应用程序可以使用这些接口操作持久对象。这些接口的特定于数据库的运行时库提供了实现一个具体的数据库以及其他特定于数据库实用工具生成的代码使用的正常情况下,应用程序并不直接使用特定于数据库的运行时库,而是与它从libodb通过公共接口。下面的图表显示了一个使用MysQL作为底层数据库系统的应用程序的对象持久性架构：</p><p class="p"><img class="image" src="../../_images/2022/odb_2.png"></p><p class="p">ODB系统还定义了两种特殊用途的语言:ODB Pragma语言和ODB查询语言。ODB Pragma语言通过嵌入在C++头文件中的特殊的#pragm
+a指令将持久化类的各种属性传递给ODB编译器。它控制对象-关系映射的各个方面，比如用于持久类及其成员的表和列的名称，或者C++类型和数据库类型之间的映射.</p><p class="p">ODB查询语言是一种面向对象的数据库查询语言，可用于搜索匹配特定条件的对象。它是仿造的，并集成到C++中，允许您编写具有表达性和安全性的查询，这些查询看起来和感觉上就像普通的C++。</p><p class="p">使用ODB编译器生成数据库支持代码为应用程序的构建序列增加了额外的步骤。下图概述了使用ODB的应用程序的典型构建流程：</p><p class="p"><img class="image" src="../../_images/2022/odb_3.png"></p></section>
+<section class="section"><h2 class="title sectiontitle">准备工作</h2><p class="p">以sqlite为例，在windows平台，用VS2013来搭建开发环境。</p><p class="p">1，下载安装包</p><p class="p">2，下载ODB核心库</p><p class="p">3，下载数据库运行库</p><p class="p">4，下载例子程序</p><p class="p">5，下载sqlite的源文件(用sqlite所以需要)</p><p class="p"><img class="image" src="../../_images/2022/odb_1.png"></p><p class="p">由于是windows平台，sqlite数据库，用的以下文件。(别的平台，别的数据库下载相应该的库文件)</p><p class="p">odb-2.3.0-i686-windows(ODB的编译器，就是所对象成对sql和头文件，用于持久化相关)</p><p class="p">libodb-2.3.0(ODB的核心库，编译出来的odb_d.lib(Debug版本)在examples中需要)</p><p class="p">libodb-sqlite-2.3.0(odb操作sqlite的相关功能，编译出来的odb-sqlite-d.lib(Debug版本)在examples中需要)</p><p class="p">odb-examples-2.3.0 (odb的例子和演示)</p></section>
+<section class="section"><h2 class="title sectiontitle">安装ODB</h2><p class="p">安装很简单。</p><p class="p">1，解压odb-2.3.0-i686-windows，</p><p class="p">2，把bin目录加到环境变量中</p><p class="p">3，命令行输入odb --version看是否安装成功</p><p class="p">详细的可以看README里面写的。</p><p class="p">如现如下提示，可以就说安装成功了</p></section>
+<section class="section"><h2 class="title sectiontitle">1.2 好处</h2><p class="p">将C++对象保存到关系数据库的传统方法要求您手工编写代码，在数据库和每个持久化类的C++表示之间进行转换。</p><div class="p">这些代码通常执行的操作包括C++值与字符串或数据库类型之间的转换、SQL查询的准备和执行，以及处理结果集。手动编写这段代码有以下缺点：<ol class="ol">
+<li class="li"><p class="p">这既困难又费时。为任何重要的应用程序编写数据库转换代码，都需要对特定的数据库系统及其API有广泛的了解。它还需要相当多的时间来编写和维护。支持多线程应用程序会使这个任务更加复杂。</p></li>
+<li class="li"><p class="p">表现不佳。最优的转换通常需要编写大量额外的代码，比如用于准备好的语句和缓存连接、语句和缓冲区的参数bindina。以一种特殊的方式编写这样的代码通常太困难，也太耗费时间。</p></li>
+<li class="li"><p class="p">数据库厂商锁定。转换代码是为一个特定的数据库，这使得很难切换到其他数据库供应商。</p></li>
+<li class="li"><p class="p">缺少类型安全。在SQL Queries查询中很容易拼错列名或传递不兼容的值。这样的错误只会在运行时被检测到。</p></li>
+<li class="li"><p class="p">复杂的应用程序。数据库转换代码通常分散在整个应用程序中，使其难以调试、更改和维护。</p></li>
+</ol></div><p class="p">相比之下，使用ODB实现C++对象持久性有以下好处 ：</p><ol class="ol">
+<li class="li"><p class="p">易用性。ODB从C++类声明自动生成数据库转换代码，并允许您使用简单和线程安全的面向对象的数据库API操作持久对象。</p></li>
+<li class="li"><p class="p">简洁的代码。由于ODB隐藏了底层数据库的细节，应用程序loaic是使用自然对象词汇表而不是表来编写的。列和SOL，结果代码更简单，因此更容易阅读和理解。</p></li>
+<li class="li"><p class="p">最佳性能。ODB被设计为高性能和低内存开销。所有可用的优化技术，如准备语句和扩展连接、语句和缓冲区缓存，都用于为每个数据库操作提供最有效的实现。</p></li>
+<li class="li"><p class="p">数据库的可移植性。由于数据库转换代码是自动生成的，所以很容易从一个数据库供应商切换到另一个数据库供应商。事实上，在做出选择之前，可以在几个数据库系统上测试您的应用程序安全。ODB对象持久化和查询API是静态类型的。使用C++标识符而不是字符串来引用对象成员，生成的代码确保数据库和C++类型是兼容的。所有这些都有助于在编译时捕获编程错误，而不是在运行时捕获。</p></li>
+<li class="li"><p class="p">可维护性。自动代码生成将使应用程序适应持久类中的更改所需的工作量降至最低。数据库支持代码与类声明和应用程序逻辑是分开的。这使得应用程序更容易调试和维护。</p></li>
+</ol><p class="p">总的来说，ODB为C++提供了一个易于使用的、灵活而强大的对象关系映射(ORM)系统。与C++的其他ORM实现不同的是，它仍然要求您为每个持久化类编写数据库转换或成员注册代码，ODB保持持久化类纯粹是声明性的。功能部分，即数据库转换代码，是由ODB编译器从这些声明自动生成的。</p></section>
+<section class="section"><h2 class="title sectiontitle">1.3 支持的 C++ 标准</h2><p class="p">ODB 为 ISO/IEC C++ 1998/2003
+(C++98/03)、ISO/IEC TR 19768 提供支持C++库扩展(C++ TR1)和ISO/IEC C++ 2011 (C++
+11)。虽然本手册中的大多数示例使用的是C++ 98/03，但对TR1和C++ 11中引入的新功能和库组件的支持在整个文档中都有讨论。ODB
+-examples包中的C++11示例还显示了对各种C++11特性的ODB支持。</p></section>
+<section class="section"><h2 class="title sectiontitle">2 Hello World 示例</h2><p class="p">在本章中，我们将展示如何使用传统的“Hello
+World”示例创建一个简单的依赖于或ODB的C+应用程序来实现对象持久性。特别是，我们将讨论如何声明持久类、生成数据库支持代码以及编译和运行我们的应用程序。我们还将学习如何使对象具有持久性、加载、更新和删除持久性对象，以及在数据库中查询匹配特定条件的持久性对象。该示例还展示了如何定义和使用视图，视图是一种机制，允许我们创建持久对象的投影、数据库表，或者处理本机sQL查询或存储过程调用的结果。</p><p class="p">本章中给出的代码基于hello示例，该示例可以在ODR发行版的odb-examples包中找到。</p></section>
+<section class="section"><h2 class="title sectiontitle">2.1 声明持久类</h2><p class="p">在“Hello World”的例子中，我们会稍微偏离常规，向人们而不是整个世界问好。在我们的应用程序中，person将表示为C++类person的对象，person
+保存在 person.hxx 文件中：</p><div class="p"><pre class="pre codeblock"><code>// person.hxx
+//
+
+#include &lt;string&gt;
+
+class person
+{
+public:
+  person (const std::string&amp; first,
+          const std::string&amp; last,
+          unsigned short age);
+
+  const std::string&amp; first () const;
+  const std::string&amp; last () const;
+
+  unsigned short age () const;
+  void age (unsigned short);
+
+private:
+  std::string first_;
+  std::string last_;
+  unsigned short age_;
+};</code></pre></div><p class="p">为了不错过我们需要问候的任何人，我们希望将person对象保存在数据库中。为了实现这一点，我们将person类声明为persistent：</p><div class="p"><pre class="pre codeblock"><code>// person.hxx
+//
+
+#include &lt;string&gt;
+
+#include &lt;odb/core.hxx&gt;     // (1)
+
+#pragma db object           // (2)
+class person
+{
+  ...
+
+private:
+  person () {}              // (3)
+
+  friend class odb::access; // (4)
+
+  #pragma db id auto        // (5)
+  unsigned long id_;        // (5)
+
+  std::string first_;
+  std::string last_;
+  unsigned short age_;
+};</code></pre></div><p class="p">为了能够将person对象保存在数据库中，我们必须对原始类定义做5个更改，标记为(1)到(5)。</p><p class="p">第一个变化是包含了ODB头文件&lt;odb/core.hx&gt;。该头文件提供了许多核心ODB声明，如ODB: access，这些声明用于定义持久类。</p><p class="p">第二个更改是在类定义之前添加了db对象pragma。这个pragma告诉ODB编译器，后面的类是持久的。请注意，使类持久并不意味着该类的所有对象将自动存储在数据库中。您仍然可以像以前一样创建这个类的普通或暂时实例。不同的是，现在您可以将这样的瞬态实例持久化，我们将很快看到这一点。</p><p class="p">第三个更改是添加了默认构造函数。odb生成的数据库支持代码在从持久状态实例化对象时将使用这个构造函数。就像我们对person类所做的那样，如果不想让类的用户使用默认构造函数，可以将其设为private或protected。还请注意，有一些限制，可以有一个没有默认构造函数的持久化类在</p><p class="p">第四个更改中，我们使odb::access类成为person类的朋友。这是使默认构造函数和数据成员可被数据库支持代码访问所必需的。如果您的类有一个公共默认构造函数和公共数据成员，或者数据成员的公共访问器和修饰符，那么友元声明是不必要的。</p><p class="p">最后一个更改是添加一个名为id的数据成员，在ODB中，id之前是另一个pragma，每个持久对象通常在其类中有一个唯一的标识符。或。换句话说，同一类型的两个持久实例没有相同的标识符。</p><p class="p">虽然可以定义一个持久化类没有标识id,但会使得可执行的数据库操作受到限制。在本例中，持久化类使用整数id。类成员id_ 之前的#pragma
+db id auto 告诉ODB编译器,以下是种的成员标识符。auto指示符表明它是一个数据库分配的id。唯一的id将由数据库自动生成，并在持久化时关联到对象。</p><p class="p">在本例中，我们选择添加一个标识符，因为现有的成员都不能满足相同的目的。但是，如果一个类已经有一个具有合适属性的成员。然后很自然地使用该成员作为标识符。例如,如果我们的person类包含某种形式的个人身份证号码(美国SSN或其他国家的身份证/护照号码),然后我们可以使用它作为一个ID,或者如果我们存储与每个人相关的电子邮件,然后我们可以使用,如果每个人都认为有一个唯一的电子邮件地址。</p><p class="p">作为另一个示例，考虑person类的以下替代版本。这里我们使用一个现有的数据成员作为id。此外，数据成员保持私有，而是通过公共访问器和修饰符函数访问。最后，将ODB
+pragma分组在一起并放在类定义之后。也可以将它们移到单独的头文件中，使原始类完全保持不变(有关这种非侵入式转换的更多信息，请参阅
+Chapter 14, "ODB Pragma Language")。</p><div class="p"><pre class="pre codeblock"><code>class person
+{
+public:
+  person ();
+
+  const std::string&amp; email () const;
+  void email (const std::string&amp;);
+
+  const std::string&amp; get_name () const;
+  std::string&amp; set_name ();
+
+  unsigned short getAge () const;
+  void setAge (unsigned short);
+
+private:
+  std::string email_;
+  std::string name_;
+  unsigned short age_;
+};
+
+#pragma db object(person)
+#pragma db member(person::email_) id</code></pre></div><p class="p">现在我们有了带有persistent类的头文件，让我们看看如何生成数据库支持代码。</p></section>
+<section class="section"><h2 class="title sectiontitle">2.2 生成数据库支持代码</h2><p class="p">我们在上一节中创建的持久化类定义对任何能够实际完成任务并将人的数据存储到数据库的代码都特别轻。没有序列化或反序列化代码，甚至没有数据成员注册，这些代码通常需要在C++的其他ORM库中手工编写。这是因为在ODB代码中，在数据库和C++之间转换对象的表示是由ODB编译器自动生成的。</p><p class="p">编辑我们在上一节创建的这个persion.hxx头文件，并生成MySQL数据库的支持代码，我们从终端UNIX调用或Windows命令提示符调用ODB编译器：</p><p class="p"><code class="ph codeph">db -d mysql -generate-query person.hxx</code></p><p class="p">在本章的剩余部分，我们将使用MySQL作为首选数据库，当然也可以使用其他支持的数据库系统。</p><p class="p">如果你没有安装 the common
+ODB runtime library (libodb) 或者安装到C++编译器默认不搜索头的目录中，那么你可能会得到以下错误：</p><p class="p">person.hxx:10:24: fatal error: odb/core.hxx: No such file or directory</p><p class="p">要解决这个问题，你需要用-I预处理器选项指定libodb头文件的位置，例如 :</p><p class="p"><code class="ph codeph">odb -I.../libodb
+-d mysql --generate-query person.hxx</code></p><p class="p">在这里&nbsp; .../libodb&nbsp;
+表示 libodb目录的路径。</p><div class="p">上面对ODB编译器的调用会产生三个C++文件： <ol class="ol">
+<li class="li"><p class="p">person-odb.hxx</p></li>
+<li class="li"><p class="p">person-odb.ixx</p></li>
+<li class="li"><p class="p">person-odb.cxx</p></li>
+</ol>通常不直接使用这些文件中包含的类型或函数。您需要做的只是在要执行数据库操作C++文件中包含person-odb.hxx，以使用person.hxx以及person_odb.cxx中的类，并将生成的对象文件链接到应用程序。</div><p class="p">您可能想知道——generate-query选项是用来干什么的。它指示ODB编译器生成可选的查询支持代码，我们将在稍后的“Hello
+World”示例中使用这些代码。我们会发现另一个有用的选项是——generate-schema。这个选项使ODB编译器生成第四个文件person.sql，它是person.hxx中定义的持久类的数据库模型脚本。</p><p class="p"><code class="ph codeph">odb -d mysql --generate-query --generate-schema person.hxx</code></p><p class="p">数据库模型文件包含创建存储持久化类所需的表的SQL语句。我们将在下一节中学习如何使用它。</p><p class="p">如果您想查看所有可用ODB编译器选项的列表，请参阅
+ODB Compiler Command Line Manual.。</p><p class="p">现在我们已经有了持久化类和数据库支持代码，剩下的唯一部分就是应用程序代码，它可以用这些代码做一些有用的事情。但是在我们进入有趣的部分之前，让我们首先了解如何构建和运行使用ODB的应用程序。这样，当我们有一些应用程序代码要尝试时，在我们可以运行它之前就不会有更多的延迟。</p></section>
+<section class="section"><h2 class="title sectiontitle">2.3 编译运行</h2><p class="p">假设main()函数和应用程序代码保存在driver.cxx中。如前一节所述，生成了数据库d的支持代码和模型，为了构建我们的应用程序，我们首先需要编译所有C++源文件，然后将它们与两个ODB运行时库链接起来</p><p class="p">在UNIX上，编译部分可以用以下命令完成(用C++编译器的名称替换C++;关于Microsoft Visual Studio的设置，请参阅odb-examples
+packaqe);</p><div class="p"><pre class="pre codeblock"><code>C++ -c driver.cxx
+C++ -c person-odb.cxx</code></pre></div><p class="p">与ODB编译类似，如果在ODB /或ODB/mysql目录中没有找到头文件，则需要使用-I预处理器选项来指定公共ODB运行时库(libodb)和MySOL
+ODB运行时库(libodb-mysql)的位置。</p><p class="p">编译完成后，我们可以用以下命令链接应用程序:</p><p class="p"><code class="ph codeph">C++ -o driver driver.o person-odb.o -lodb-mysql -lodb</code></p><p class="p">注意，我们将应用程序与两个ODB库连接起来:libodb是一个通用的运行时库，libodb- MySQL是一个MySQL运行时库(如果您使用另一个数据库，那么这个库的名称将相应地改变)。如果出现一个错误，说找不到这些库中的一个，那么需要使用-L链接器选项来指定它们的位置</p><p class="p">在运行应用程序之前，我们需要使用生成的person.sql创建数据库模型。对于mysql，我们可以使用mysql客户端程序，例如:</p><p class="p"><code class="ph codeph">mysql --user=odb_test --database=odb_test &lt; person.sql</code></p><p class="p">上面的命令将以odb_test用户(不带密码)登录到本地MySQL服务器，并使用名为odb test的数据库。注意，在执行这个命令之后，存储在同名odb测试数据库中的所有数据都将被删除。</p><p class="p">还要注意，使用独立生成的SQL文件并不是在ODB中创建数据库模型的唯一方法。我们还可以将模型直接嵌入到我们的应用程序中，或者使用不是由ODB编译器生成的自定义模型。详细信息请参见3.4节“数据库”。</p><p class="p">一旦数据库模型就绪，我们就使用相同的登录名和数据库名运行我们的应用程序：</p><p class="p"><code class="ph codeph">./driver --user
+odb_test --database odb_test</code></p></section>
+<section class="section"><h2 class="title sectiontitle">2.4 使对象持久化</h2><p class="p">现在我们已经完成了基础设施的工作，现在是时候看看与数据库交互的第一个代码片段了。在本节中，我们将学习如何使person对象持久化:</p><div class="p"><pre class="pre codeblock"><code>// driver.cxx
+//
+
+#include &lt;memory&gt;   // std::auto_ptr
+#include &lt;iostream&gt;
+
+//定义了独立于数据库系统的odb::database和odb::transaction接口
+#include &lt;odb/database.hxx&gt;
+#include &lt;odb/transaction.hxx&gt;
+
+//定义了MySQL实现的database接口
+#include &lt;odb/mysql/database.hxx&gt;
+
+//定义了person持久类
+#include "person.hxx"
+#include "person-odb.hxx"
+
+//两个using namespace指令。第一个引入标准名称空间的名称
+using namespace std;
+//第二个引入ODB声明，我们稍后将在文件中使用ODB声明。注意，在第二个指令中，我们使用odb::core名称空间，而不仅仅是odb。前者只在当前的命名空间中引入基本的ODB名称，如数据库和事务类，而没有任何辅助对象。这将最小化与其他库的名称冲突的可能性。还请注意，在限定单个名称时，应该继续使用odb名称空间。例如，你应该写odb:: database，而不是odb::core::database。
+using namespace odb::core;
+
+int
+main (int argc, char* argv[])
+{
+  try
+  {
+    auto_ptr&lt;database&gt; db (new odb::mysql::database (argc, argv));
+
+    unsigned long john_id, jane_id, joe_id;
+
+    // Create a few persistent person objects.
+    //
+    {
+      person john ("John", "Doe", 33);
+      person jane ("Jane", "Doe", 32);
+      person joe ("Joe", "Dirt", 30);
+
+      transaction t (db-&gt;begin ());
+
+      // Make objects persistent and save their ids for later use.
+      //
+      john_id = db-&gt;persist (john);
+      jane_id = db-&gt;persist (jane);
+      joe_id = db-&gt;persist (joe);
+
+      t.commit ();
+    }
+  }
+  catch (const odb::exception&amp; e)
+  {
+    cerr &lt;&lt; e.what () &lt;&lt; endl;
+    return 1;
+  }
+}</code></pre>main(), the first thing we do is create the MySQL database
+object. Notice that this is the last line in driver.cxx that mentions
+MySQL explicitly; the rest of the code works through the common interfaces
+and is database system-independent. We use the  argc/argv  mysql::database
+constructor which automatically extract the database  parameters,
+such as login name, password, database name, etc., from the command
+line. In your own applications you may prefer to use other mysql::database
+constructors which allow you to pass this information directly</div><p class="p">main()首先必须创建MySOL数据库对象。注意，这是driver.cxx程序末行显式声明的MySQL;main()内其余代码不依赖于数据库系统，使用公共接口工作。使用argc/argv
+mysql::database构造函数，它自动从命令行提取数据库参数，例如登录名、密码、数据库名等。在你自己的应用程序中，你也可以使用其他的mysql:database构造函数，具体查阅(第17.2节，“mysql数据库类”)</p><p class="p">接下来，我们创建三个person对象。现在它们是临时对象，这意味着如果我们在此时终止应用程序，它们将消失，而没有任何证据表明它们曾经存在过。下一行开始一个数据库事务。我们将在本手册后面详细讨论事务。现在，我们需要知道的是，所有ODB数据库操作都必须在事务中执行，事务是工作的原子单元事务中执行的所有数据库操作要么一起成功(提交)，要么自动撤消(回滚)</p><p class="p">一旦进入事务，我们就在每个person对象上调用persist O database函数。此时，每个对象的状态都保存在数据库中，但是请注意，在提交事务之前，这种状态不是永久的。例如，如果我们的应用程序在此时崩溃，仍然没有证据表明我们的对象曾经存在过</p><p class="p">在我们的例子中，当我们调用persist 0时，还会发生另一件事)。对persistto的调用是这个assiment发生的地方。一旦这个函数返回，id成员就包含这个对象的唯一标识符。为了方便起见，persist
+C函数还返回一个对象标识符的副本，该标识符已被持久化。我们将每个对象的返回标识符保存在一个局部变量中。稍后，我们将在chanter中使用这些标识符来在我们的持久对象上生成其他数据库操作。</p><p class="p">在持久化了对象之后，就该提交事务并使更改永久存在了。只有在commit)函数成功返回后，我们才能保证对象是持久的。如果我们的应用程序由于某种原因在提交后终止，那么数据库中对象的状态将保持不变。实际上，我们很快就会发现，我们的应用程序可以重新启动，并从数据库加载原始对象。还要注意，事务必须通过commit调用显式提交。如果事务对象在没有显式提交或回滚事务的情况下离开作用域，则事务对象将自动回滚。这种行为允许您不必担心在事务中抛出异常:如果异常跨越事务边界，事务将自动回滚，对数据库所做的所有更改都将撤消</p><p class="p">我们示例中的最后一部分代码是处理数据库异常的catch块。我们通过捕获基本ODB异常(Section 3.14, "ODB
+Exceptions")并打印诊断结果来实现这一点。</p><p class="p">现在让我们编译(Section 2.3, "Compiling and
+Running")，然后运行我们的第一个ODE应用程序:</p><p class="p">mysql --user=odb_test --database=odb_test
+&lt; person.sql</p><p class="p">./driver --user odb_test --database odb_test</p><p class="p">我们的第一个应用程序除了错误消息外不打印任何东西，因此我们不能真正地知道它是否实际上在数据库中存储了对象的状态。虽然我们很快就会使我们的应用程序更有趣，但是现在我们可以使用mysal客户机来检查数据库内容。它还可以让我们了解对象是如何存储的:</p><p class="p">mysql --user=odb_test --database=odb_test</p><p class="p">Welcome to the
+MySQL monitor.</p><p class="p">mysql&gt; select * from person;</p><p class="p">+----+-------+------+-----+</p><p class="p">| id | first | last | age |</p><p class="p">+----+-------+------+-----+</p><p class="p">|&nbsp; 1 | John&nbsp; | Doe&nbsp; |&nbsp; 33 |</p><p class="p">|&nbsp;
+2 | Jane&nbsp; | Doe&nbsp; |&nbsp; 32 |</p><p class="p">|&nbsp; 3 | Joe&nbsp;&nbsp;
+| Dirt |&nbsp; 30 |</p><p class="p">+----+-------+------+-----+</p><p class="p">3 rows
+in set (0.00 sec)</p><p class="p">mysql&gt; quit</p><p class="p">另一种深入了解底层情况的方法是跟踪ODB在每次数据库操作后执行的SQL语句。下面是我们如何在事务的持续时间内启用跟踪:</p><p class="p">&nbsp;// Create a few persistent person objects.</p><p class="p">&nbsp;&nbsp;&nbsp;
+//</p><p class="p">&nbsp;&nbsp;&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+...</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; transaction t (db-&gt;begin
+());</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; t.tracer (stderr_tracer);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Make objects persistent and
+save their ids for later use.</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;//</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; john_id = db-&gt;persist (john);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; jane_id = db-&gt;persist (jane);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; joe_id = db-&gt;persist (joe);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; t.commit ();</p><p class="p">&nbsp;&nbsp;&nbsp;
+}</p><p class="p">&nbsp; </p><p class="p">通过这样的修改，我们的应用程序现在产生以下输出:</p><p class="p">INSERT INTO `person`
+(`id`,`first`,`last`,`age`) VALUES (?,?,?,?)</p><p class="p">INSERT INTO `person`
+(`id`,`first`,`last`,`age`) VALUES (?,?,?,?)</p><p class="p">INSERT INTO `person`
+(`id`,`first`,`last`,`age`) VALUES (?,?,?,?)</p><p class="p">注意，我们看到的是问号而不是实际值，因为ODB使用了准备好的语句并以二进制形式将数据发送到数据库。有关跟踪的更多信息，请参阅
+Section 3.13, "Tracing SQL Statement Execution"。在下一节中，我们将看到如何从应用程序中访问持久对象。</p></section>
+<section class="section"><h2 class="title sectiontitle">2.5 查询数据库中的对象</h2><p class="p">到目前为止，我们的应用程序并不类似于典型的“Hello
+World”示例。除了错误消息外，它不会打印任何东西。让我们改变这一点，教我们的应用程序向数据库中的人打招呼。为了更有趣一点，我们只向30岁以上的人问好</p><div class="p"><pre class="pre codeblock"><code>// driver.cxx
+//
+
+...
+
+int main (int argc, char* argv[])
+{
+  try
+  {
+    ...
+
+    // Create a few persistent person objects.
+    //
+    {
+      ...
+    }
+
+    typedef odb::query&lt;person&gt; query;
+    typedef odb::result&lt;person&gt; result;
+
+    // Say hello to those over 30.
+    //
+    {
+      transaction t (db-&gt;begin ());
+
+      result r (db-&gt;query&lt;person&gt; (query::age &gt; 30));
+
+      for (result::iterator i (r.begin ()); i != r.end (); ++i)
+      {
+        cout &lt;&lt; "Hello, " &lt;&lt; i-&gt;first () &lt;&lt; "!" &lt;&lt; endl;
+      }
+
+      t.commit ();
+    }
+  }
+  catch (const odb::exception&amp; e)
+  {
+    cerr &lt;&lt; e.what () &lt;&lt; endl;
+    return 1;
+  }
+}</code></pre></div><p class="p">我们的应用程序的前半部分与前面一样，为了简洁起见，在上面的清单中用“..”替换。让我们一块一块地检查它的其余部分这两个typedef为两个模板实例化创建了方便的别名，它们将在我们的应用程序中大量使用。第一个是person对象的查询类型，第二个是该auery的结果类型。然后我们获得一个新的事务并调用querv0数据库函数。我们传递了一个查询表达式(query::
+age &gt; 30)，该表达式将返回的对象限制为年龄大于30的对象。我们还将查询结果保存在一个局部变量中。接下来的几行对结果序列执行一个标准的for循环迭代，为每个返回的人打印hello。然后提交事务，就这样。让我们看看这个应用程序将打印什么：</p><p class="p">&nbsp;</p><p class="p">mysql --user=odb_test --database=odb_test &lt; person.sql</p><p class="p">./driver --user odb_test --database odb_test</p><p class="p">Hello, John!</p><p class="p">Hello, Jane!</p><p class="p">这看起来是对的，但是我们如何知道查询实际上使用了数据库，而不是使用早期persist
+O)调用的一些内存构件呢?测试这一点的一种方法是注释掉应用程序中的第一个事务，并在不重新创建数据库模型的情况下重新运行它。这样，将返回在前一次运行期间持久化的对象。或者，我们可以重新运行相同的应用程序，而不需要重新创建模型，注意我们现在显示了重复的对象:</p><p class="p">./driver --user odb_test --database odb_test</p><p class="p">Hello, John!</p><p class="p">Hello, Jane!</p><p class="p">Hello, John!</p><p class="p">Hello, Jane!</p><p class="p">这里发生的情况是，我们的应用程序的前一次运行持久化了一组person对象，当我们重新运行应用程序时，我们持久化了另一组具有相同名称但不同id的对象。稍后运行查询时，将返回来自两个集合的匹配项。我们可以更改打印“Hello”字符串的行，如下所示来说明这一点</p><p class="p">cout &lt;&lt; "Hello, " &lt;&lt; i-&gt;first () &lt;&lt; " (" &lt;&lt;
+i-&gt;id () &lt;&lt; ")!" &lt;&lt; endl;</p><p class="p">如果我们现在重新运行这个修改过的程序，同样不需要重新创建数据库模型，我们将得到以下输出:</p><p class="p">&nbsp;</p><p class="p">./driver --user odb_test --database odb_test</p><p class="p">Hello, John (1)!</p><p class="p">Hello, Jane (2)!</p><p class="p">Hello, John (4)!</p><p class="p">Hello, Jane (5)!</p><p class="p">Hello, John (7)!</p><p class="p">Hello, Jane (8)!</p><p class="p">上面列表中缺少的标识符3、6和9属于这个查询没有选择的“Joe Dirt”对象。</p></section>
+<section class="section"><h2 class="title sectiontitle">2.6 更新持久对象</h2><p class="p">虽然使对象持久，然后使用查询选择其中一些对象是两个有用的操作，但大多数应用程序还需要更改对象的状态，然后使这些更改持久。让我们通过更新刚刚过生日的Joe的年龄来说明这一点:</p><div class="p"><pre class="pre codeblock"><code>// driver.cxx
+//
+
+...
+
+int
+main (int argc, char* argv[])
+{
+  try
+  {
+    ...
+
+    unsigned long john_id, jane_id, joe_id;
+
+    // Create a few persistent person objects.
+    //
+    {
+      ...
+
+      // Save object ids for later use.
+      //
+      john_id = john.id ();
+      jane_id = jane.id ();
+      joe_id = joe.id ();
+    }
+
+    // Joe Dirt just had a birthday, so update his age.
+    //
+    {
+      transaction t (db-&gt;begin ());
+
+      auto_ptr&lt;person&gt; joe (db-&gt;load&lt;person&gt; (joe_id));
+      joe-&gt;age (joe-&gt;age () + 1);
+      db-&gt;update (*joe);
+
+      t.commit ();
+    }
+
+    // Say hello to those over 30.
+    //
+    {
+      ...
+    }
+  }
+  catch (const odb::exception&amp; e)
+  {
+    cerr &lt;&lt; e.what () &lt;&lt; endl;
+    return 1;
+  }
+}</code></pre></div><p class="p">新交易的开始和结束与前两次相同。一旦在一个事务中，我们调用loadO数据库函数来用Joe的持久状态实例化一个personor对象。我们传递Joe的对象标识符，这个标识符是我们之前在持久化这个对象时存储的。虽然这里我们使用std::
+auto ptr来管理返回的对象，但我们也可以使用另一个智能指针，例如C++ 11中的std::unique ptr或TR1、C++
+11或Boost中的shared ptr。有关对象生命周期管理和智能指针的更多信息，&nbsp;Section 3.3, "Object
+and View Pointers"</p><p class="p">有了实例化的对象之后，我们增加了对象的年龄，并调用update0函数来更新对象在数据库中的状态。事务提交后，更改将永久生效。如果我们现在运行这个应用程序，我们将在输出中看到Joe，因为他现在已经超过30岁了</p><p class="p">mysql --user=odb_test --database=odb_test &lt; person.sql ./driver
+--user odb_test --database odb_test  Hello, John! Hello, Jane! Hello,
+Joe!</p><p class="p">如果我们没有乔的标识符呢?也许这个对象在我们的应用程序的另一次运行中，或者由另一个应用程序完全持久。如果我们的数据库中只有一个Joe
+Dirt，我们可以使用查询功能来提供上述事务的替代实现:</p><div class="p"><pre class="pre codeblock"><code> // Joe Dirt just had a birthday, so update his age. An
+    // alternative implementation without using the object id.
+    //
+    {
+      transaction t (db-&gt;begin ());
+
+      // Here we know that there can be only one Joe Dirt in our
+      // database so we use the query_one() shortcut instead of
+      // manually iterating over the result returned by query().
+      //
+      auto_ptr&lt;person&gt; joe (
+        db-&gt;query_one&lt;person&gt; (query::first == "Joe" &amp;&amp;
+                               query::last == "Dirt"));
+
+      if (joe.get () != 0)
+      {
+        joe-&gt;age (joe-&gt;age () + 1);
+        db-&gt;update (*joe);
+      }
+
+      t.commit ();
+    }</code></pre></div></section>
+<section class="section"><h2 class="title sectiontitle">2.7 定义和使用视图</h2><p class="p">假设我们需要收集关于存储在数据库中的人员的一些基本统计信息。比如总人数，以及最小和最大年龄。一种方法是在数据库中查询所有person对象，然后在遍历查询结果时计算该信息。虽然这种方法在只有三个人的数据库中工作得很好，但是如果我们有大量的对象，它的效率就会非常低。虽然从面向对象编程的角度来看，关系数据库在概念上可能不纯粹，但它可以比我们自己在应用程序过程中执行相同的操作更快、更经济地执行一些计算。为了支持这种情况，ODB提供了视图的概念。ODB视图是一个C++类，它包含一个或多个持久对象或数据库表、本机SOL查询执行或存储过程调用的结果的轻量级只读投影。视图的一些常见应用包括loadina(对象或列数据库表中的数据成员子集)，执行和处理任意SQL查询的结果，包括聚合查询，以及使用对象关系或自定义连接条件连接多个对象和/或数据库表。你可以在Chapter
+10, "Views",中找到更详细的视图描述，下面是我们如何定义person统计视图，它返回关于person对象的基本统计信息:</p><div class="p"><pre class="pre codeblock"><code>#pragma db view object(person)
+struct person_stat
+{
+  #pragma db column("count(" + person::id_ + ")")
+  std::size_t count;
+
+  #pragma db column("min(" + person::age_ + ")")
+  unsigned short min_age;
+
+  #pragma db column("max(" + person::age_ + ")")
+  unsigned short max_age;
+};</code></pre></div><p class="p">通常，为了获得视图的结果，我们使用与在数据库中查询对象时相同的query0函数。然而，这里我们执行的聚合查询总是只返回一个元素。因此，我们可以使用快捷的query_value
+C函数，而不是获取结果实例然后遍历它。下面是我们如何使用刚刚创建的视图来加载和打印统计信息:</p><div class="p"><pre class="pre codeblock"><code>// Print some statistics about all the people in our database.
+    //
+    {
+      transaction t (db-&gt;begin ());
+
+      // The result of this query always has exactly one element.
+      //
+      person_stat ps (db-&gt;query_value&lt;person_stat&gt; ());
+
+      cout &lt;&lt; "count  : " &lt;&lt; ps.count &lt;&lt; endl
+           &lt;&lt; "min age: " &lt;&lt; ps.min_age &lt;&lt; endl
+           &lt;&lt; "max age: " &lt;&lt; ps.max_age &lt;&lt; endl;
+
+      t.commit ();
+    }</code></pre></div><p class="p">如果我们现在将person统计视图添加到person。hx头文件，上面的事务到驱动程序。cxx，以及重新编译和重新运行我们的示例，然后我们将在输出中看到以下额外的行:</p><p class="p">&nbsp;</p><p class="p">count&nbsp; : 3</p><p class="p">min age: 31</p><p class="p">max age:
+33</p><p class="p">&nbsp; </p></section>
+<section class="section"><h2 class="title sectiontitle">2.8 删除持久对象</h2><p class="p">我们将在本章中讨论的最后一个操作是从数据库中删除持久对象。下面的代码片段展示了如何在给定标识符的情况下删除对象:</p><div class="p"><pre class="pre codeblock"><code> // John Doe is no longer in our database.
+    //
+    {
+      transaction t (db-&gt;begin ());
+      db-&gt;erase&lt;person&gt; (john_id);
+      t.commit ();
+    }</code></pre></div><p class="p">为了从数据库中删除John，我们启动一个事务，使用John的对象id调用erase0)数据库函数，并提交事务。事务提交后，删除后的对象不再持久。如果手边没有对象id，可以使用查询来查找和删除对象:</p><div class="p"><pre class="pre codeblock"><code>// John Doe is no longer in our database. An alternative
+    // implementation without using the object id.
+    //
+    {
+      transaction t (db-&gt;begin ());
+
+      // Here we know that there can be only one John Doe in our
+      // database so we use the query_one() shortcut again.
+      //
+      auto_ptr&lt;person&gt; john (
+        db-&gt;query_one&lt;person&gt; (query::first == "John" &amp;&amp;
+                               query::last == "Doe"));
+
+      if (john.get () != 0)
+        db-&gt;erase (*john);
+
+      t.commit ();
+    }</code></pre></div></section>
+<section class="section"><h2 class="title sectiontitle">2.9 改变持久类</h2><p class="p">当一个暂态C++类的定义被改变时。例如，通过addina或删除数据成员，我们不必担心该类的任何existina实例与新定义不匹配。毕竟，要使类更改有效，我们必须重新启动应用程序，而没有一个瞬态实例能够幸免于此。对于持久类，事情就不那么简单了。由于它们存储在数据库中，因此不会受到应用程序重启的影响，因此我们有了一个新问题:更改持久化类后，现有对象(对应于旧定义)的状态会发生什么变化?处理旧对象的问题(称为数据库模型演变)是一个复杂的问题，ODB为handlina
+it提供了全面的支持。这种支持在第13章“数据库模型的演变”中有详细介绍，让我们考虑一个简单的例子，它应该让我们对DB在这方面提供的功能有一个感觉假设在使用我们的持久化类的人一段时间后,创建一个数据库包含它的实例数量,我们意识到,对于一些人来说我们还需要存储他们的中间名,如果我们ao
+iust添加新的数据成员,一切都将好与新数据库。然而，现有的数据库有一个与新的类定义不对应的表，具体地说，生成的数据库支持代码现在期望有一个列来存储中间名，但是这样的列从来没有在旧数据库中创建过。ODB可以自动生成SQL语句，使旧数据库与新的类定义匹配。但首先，我们需要通过为对象模型定义一个版本来支持模型演进:</p><div class="p"><pre class="pre codeblock"><code>// person.hxx
+//
+
+#pragma db model version(1, 1)
+
+class person
+{
+  ...
+
+  std::string first_;
+  std::string last_;
+  unsigned short age_;
+};</code></pre></div><p class="p">版本pragma中的第一个数字是基本模型版本。这是我们能够迁移的最低版本。第二个数字是当前的模型版本。因为我们还没有对persistent类做任何更改，所以这两个值都是1。接下来，我们需要重新编译person。hx头文件与ODB编译器，就像我们之前做的:</p><p class="p"><code class="ph codeph">odb -d mysql --generate-query --generate-schema person.hxx</code></p><p class="p">如果我们现在查看ODB编译器生成的文件列表，我们会注意到一个新文件:person。xml。这是一个changelog文件，ODB编译器在其中跟踪与我们的类更改相对应的数据库更改。注意，这个文件是由ODB编译器自动维护的，我们所要做的就是在重新编译之间保存它。现在，我们准备将中间名添加到person类中。我们还为它指定了一个默认值(空字符串)，该值将被分配给ald数据库中的现有对象。注意，我们还增加了当前版本:</p><div class="p"><pre class="pre codeblock"><code>// person.hxx
+//
+
+#pragma db model version(1, 2)
+
+class person
+{
+  ...
+
+  std::string first_;
+
+  #pragma db default("")
+  std::string middle_;
+
+  std::string last_;
+  unsigned short age_;
+};</code></pre></div><p class="p">如果我们现在重新编译person。hx头文件，我们将看到两个额外生成的文件:person-002-pre。sql和人-
+002。sql。这两个文件包含从版本1到版本2的模型迁移语句。与模型创建类似，模型迁移语句也可以嵌入到生成的C++代码中人- 002前。sql和人-
+002。sql是前后模型迁移文件。要迁移一个旧的数据库，我们首先执行预迁移文件:</p><p class="p"><code class="ph codeph">mysql --user=odb_test
+--database=odb_test &lt; person-002-pre.sql</code></p><p class="p">如果需要，在模型迁移前和迁移后，我们可以运行数据迁移代码。在这个阶段，我们既可以访问旧数据，也可以存储新数据。在本例中，我们不需要任何数据迁移代码，因为我们为所有现有对象的中间名添加了默认值为了完成迁移过程，我们执行post迁移语句</p><p class="p"><code class="ph codeph">mysql --user=odb_test --database=odb_test &lt; person-002-post.sql</code></p></section>
+<section class="section"><h2 class="title sectiontitle">2.10 访问多个数据库</h2><p class="p">访问多个数据库(即数据存储)只是创建多个表示每个数据库的odb:b&gt;::
+database实例的问题。例如:</p><p class="p">odb::mysql::database db1 ("john", "secret",
+"test_db1");</p><p class="p">odb::mysql::database db2 ("john", "secret", "test_db2");</p><p class="p">一些数据库系统还允许将多个数据库附加到同一个实例上。更有趣的问题是我们如何从同一个应用程序访问多个数据库系统(即数据库实现)。例如，我们的应用程序可能需要将一些对象存储在远程MySQL数据库中，而其他对象存储在loca
+SQLite文件中。或者，我们的应用程序可能需要能够将其对象存储在用户在运行时选择的数据库系统中。ODB提供了全面的多数据库支持，从与特定数据库系统的紧密集成到能够编写数据库aanostic代码，以及单个数据库系统的动态支持。所有这些方面都将在
+Chapter 16, "Multi-Database Support"，在本节中，我们将对“Hello World”示例进行扩展，使其能够将数据存储在MySOL或PostqresOL中(ODB支持的其他数据库系统也可以以类似的方式添加)，从而了解该功能。addina多数据库支持的第一步是重新编译人员。hxx头文件为附加的数据库系统生成数据库支持代码:</p><p class="p">odb --multi-database dynamic -d common -d mysql -d pgsql \</p><p class="p">--generate-query --generate-schema person.hxx</p><p class="p">——multi-database
+ODB编译器选项打开了多数据库支持。目前，我们传递给该选项的动态值的含义并不重要，但如果您想了解，请参阅第16章。这个命令的结果是生成了三组文件:person-odb。?
+x(公共接口对应于通用数据库)，person-odb-mysql。?xx (MySQL支持代码)和person-odb-pgsql。xx
+(PostgreSQL支持代码)。还有两个模型文件:person-mysql。sql和person-pgsql.sql。唯一需要改变的部分是驱动程序。cxx是我们创建数据库实例的方式。具体地说,这条线:</p><p class="p">auto_ptr&lt;database&gt; db (new odb::mysql::database (argc, argv));</p><p class="p">现在，我们的示例能够在MysOL或PostaresQL中存储其数据，因此我们需要以某种方式允许调用者指定我们必须使用哪个数据库。为了简单起见，我们将让第一个命令行参数指定我们必须使用的数据库系统，而其他参数将包含特定于数据库的选项，我们将像前面一样传递给odb::
+&lt;ab&gt;:: database构造函数。让我们把所有这些loaic放到一个单独的函数中，我们将调用create database
+0)。cxx看起来像(其余部分没有改变):</p><div class="p"><pre class="pre codeblock"><code>// driver.cxx
+//
+
+#include &lt;string&gt;
+#include &lt;memory&gt;   // std::auto_ptr
+#include &lt;iostream&gt;
+
+#include &lt;odb/database.hxx&gt;
+#include &lt;odb/transaction.hxx&gt;
+
+#include &lt;odb/mysql/database.hxx&gt;
+#include &lt;odb/pgsql/database.hxx&gt;
+
+#include "person.hxx"
+#include "person-odb.hxx"
+
+using namespace std;
+using namespace odb::core;
+
+auto_ptr&lt;database&gt;
+create_database (int argc, char* argv[])
+{
+  auto_ptr&lt;database&gt; r;
+
+  if (argc &lt; 2)
+  {
+    cerr &lt;&lt; "error: database system name expected" &lt;&lt; endl;
+    return r;
+  }
+
+  string db (argv[1]);
+
+  if (db == "mysql")
+    r.reset (new odb::mysql::database (argc, argv));
+  else if (db == "pgsql")
+    r.reset (new odb::pgsql::database (argc, argv));
+  else
+    cerr &lt;&lt; "error: unknown database system " &lt;&lt; db &lt;&lt; endl;
+
+  return r;
+}
+
+int
+main (int argc, char* argv[])
+{
+  try
+  {
+    auto_ptr&lt;database&gt; db (create_database (argc, argv));
+
+    if (db.get () == 0)
+      return 1; // Diagnostics has already been issued.
+
+    ...</code></pre></div><p class="p">就是这样。剩下的唯一事情就是构建并运行我们的示例:</p><p class="p">C++ -c driver.cxx</p><p class="p">C++ -c person-odb.cxx</p><p class="p">C++ -c person-odb-mysql.cxx</p><p class="p">C++ -c person-odb-pgsql.cxx</p><p class="p">C++ -o driver driver.o person-odb.o
+person-odb-mysql.o \</p><p class="p">person-odb-pgsql.o -lodb-mysql -lodb-pgsql
+-lodb</p><p class="p">下面是我们如何访问MySQL数据库:</p><p class="p">&nbsp;</p><p class="p">mysql --user=odb_test
+--database=odb_test &lt; person-mysql.sql</p><p class="p">./driver mysql --user
+odb_test --database odb_test</p><p class="p">或者PostgresQL数据库:</p><p class="p">psql --user=odb_test
+--dbname=odb_test -f person-pgsql.sql</p><p class="p">./driver pgsql --user
+odb_test --database odb_test </p></section>
+<section class="section"><h2 class="title sectiontitle">2.11 总结</h2><p class="p">本章展示了一个非常简单的应用程序，尽管如此，它执行了所有的核心数据库函数:persist()、query()、load()、update()和erase()。我们还看到，编写一个使用ODB的应用程序涉及以下步骤:1.
+在头文件中声明持久类2. 编译这些头文件以生成数据库支持代码。3.将应用程序与生成的代码和两个ODB运行时库链接起来。在这一点上，如果有很多事情看起来不清楚，也不必担心。本章的目的只是给你一个关于如何用ODB持久化C++对象的一般概念。我们将在本手册的其余部分讨论所有细节</p></section>
+<section class="section"><h2 class="title sectiontitle">3 使用持久对象</h2><p class="p">前几章介绍了ODB的高级概述，并展示了如何使用它来存储数据库中的C++对象。在本章中，我们将更详细地研究ODB对象持久性模型以及核心数据库API。我们将从第3.1节和第3.3节中的基本概念和术语开始，继续讨论第3.4节中的odb:：database类、第3.5节中的事务以及第3.6节中的连接。本章的其余部分将讨论核心数据库操作，并以ODB异常的讨论作为结束。</p><p class="p">在本章中，我们将继续使用并扩展我们在前一章中开发的person持久类。 </p></section>
+<section class="section"><h2 class="title sectiontitle">3.1 概念和术语</h2><p class="p">术语数据库可以指三种不同的东西：应用程序存储其数据的地方的一般概念，管理此数据的软件实现(例如MySQL)，最后，一些数据库软件实现可以管理多个通常按名称区分的数据存储。此名称通常也称为数据库。 </p><p class="p">在本手册中，当我们使用单词database时，我们引用上面的第一个意思，例如，“update()函数将对象的状态保存到数据库中。”术语数据库管理系统(DBMS)通常用于指代“数据库”一词的第二种含义。在本手册中，我们将简称“数据库系统”，例如，“与数据库系统无关的应用程序代码”最后，为了区分第三种含义与其他两种含义，我们将使用术语database
+name，例如，“第二个选项指定应用程序应用于存储其数据的数据库名称。” </p><p class="p">在C++中，只有一种类型的概念和类型的实例。例如，基本类型(如int)在大多数情况下被视为与用户定义的类类型相同。但是，当涉及到持久性时，我们必须对某些可以存储在数据库中的C++类型设置一定的限制和要求。因此，我们将持久性C++类型分为两类：对象类型和值类型。对象类型的实例称为对象，值类型的实例称为值。 </p><p class="p">对象是一个独立的实体。它可以独立于其他对象在数据库中存储、更新和删除。通常，对象具有一个称为对象id的标识符，该标识符在数据库中对象类型的所有实例中都是唯一的。相反，值只能作为对象的一部分存储在数据库中，并且没有自己的唯一标识符。 </p><p class="p">对象由数据成员组成，这些数据成员是值(第7章“值类型”)、指向其他对象的指针(第6章“关系”)或值容器或指向其他对象的指针(第5章“容器”)。指向其他对象和容器的指针可以视为特殊类型的值，因为它们也只能作为对象的一部分存储在数据库中。 </p><p class="p">对象类型是C++类。由于这种一对一的关系，我们将交替使用术语“对象类型”和“对象类”。相反，值类型可以是基本C++类型，例如int或类类型，例如STD::String。如果一个值由其他值组成，则称为复合值及其类型-复合值类型(第7.2节，“复合值类型”)。否则，该值称为简单值及其类型-简单值类型(第7.1节，“简单值类型”)。请注意，简单值和复合值之间的区别是概念性的，而不是代表性的。例如，std:：string是一种简单的值类型，因为从概念上讲，string是一个值，即使string类的表示可能包含多个数据成员，每个数据成员都可以被视为一个值。事实上，相同的值类型可以被不同的应用程序视为简单值和复合值。 </p><p class="p">虽然在纯面向对象的应用程序中并非绝对必要，但实际考虑通常要求我们仅加载对象数据成员的子集或来自多个对象的成员组合。我们可能还需要对关系数据库进行一些计算，而不是在应用程序的过程中执行这些计算。为了支持这样的需求，ODB区分了第三种C++类型，称为视图(第10章，“视图”)。ODB视图是一个C++类，它包含一个或多个持久对象或数据库表的轻量、只读投影或本机SQL查询执行的结果。 </p><p class="p">了解所有这些概念如何映射到关系模型，有望使这些区别更加清晰。在关系数据库中，对象类型映射到表，值类型映射到一个或多个列。简单值类型映射到单个列，而复合值类型映射到多个列。对象在该表中存储为一行，并输入一个值 </p><p class="p">回到简单值和复合值之间的区别，考虑一个日期类型，它有三个整数成员：年、月和日。在一个应用程序中，它可以被视为一个复合值，并且每个成员将在关系数据库中获得自己的列。在另一个应用程序中，它可以被视为一个简单的值，并作为从某个预定义日期开始的天数存储在单个列中。 </p><p class="p">到目前为止，我们一直使用术语persistent class来指代对象类。我们将继续这样做，即使值类型也可以是类。这种不对称的原因是在数据库操作中，值类型的从属性质。请记住，值从不直接存储，而是作为包含它们的对象的一部分存储。因此，当我们说要让C++类持久化或在数据库中保存类的实例时，我们总是引用对象类而不是值类。</p><p class="p">通常，您会使用对象类型对真实世界的实体进行建模，这些实体具有自己的标识。例如，在上一章中，我们创建了一个person类来对person进行建模，person是一个真实的实体。在person类中用作数据成员的Name和age显然是值。很难想象31岁或叫“乔”有自己的身份。 </p><p class="p">确定某事物是一个对象还是一个值是一个很好的测试，是考虑其他对象是否可以引用它。一个人显然是一个对象，因为它可以被其他对象引用，例如配偶、雇主或银行。另一方面，一个人的年龄或名字并不是其他物体通常所指的东西。 </p><p class="p">此外，当一个对象代表一个真实的实体时，很容易选择一个合适的对象id。例如，对于一个人来说，有一个确定的标识符概念(SSN、学生id、护照号等)。另一种选择是使用一个人的电子邮件地址作为标识符。 </p><p class="p">但是，请注意，这些只是指南。可能有很好的理由将通常是值的东西作为对象。例如，考虑一个存储大量人的数据库。此数据库中的许多person对象具有相同的名称和姓氏，在每个对象中存储它们的开销可能会对性能产生负面影响。在这种情况下，我们可以使名字和姓氏都成为一个对象，并且只在person类中存储指向这些对象的指针。 </p><p class="p">持久类的实例可以处于两种状态之一：瞬态和持久。临时实例在应用程序的内存中只有一个表示形式，并且在应用程序终止时将不再存在，除非显式地将其永久化。换句话说，持久类的一个临时实例就像任何普通C++类的实例一样。持久实例在应用程序内存和数据库中都有表示。即使在应用程序终止之后，持久实例仍将保留，除非并直到它从数据库中显式删除。 </p></section>
+<section class="section"><h2 class="title sectiontitle">3.2 声明持久对象和值</h2><p class="p">为了使C++类成为持久对象类，我们使用db object
+pragma声明它，例如： </p><div class="p"><pre class="pre codeblock"><code>#pragma db object
+class person
+{
+  ...
+};&nbsp;</code></pre></div><p class="p">我们经常使用的另一个pragma是db id，它将其中一个数据成员指定为对象id，例如： </p><div class="p"><pre class="pre codeblock"><code>#pragma db object
+classperson
+{
+  ...#pragma db idunsignedlong id_;
+
+};</code></pre></div><p class="p">对象id可以是简单或复合(第7.2.1节“复合对象id”)值类型。此类型应为默认可构造、可复制可构造和可复制可分配。也可以在没有对象id的情况下声明持久类，但是，此类类的功能有限(第14.1.6节，“no
+id”)。 </p><p class="p">上述两个pragmas 是声明具有对象id的持久类所需的最低要求。其他pragmas 可用于微调类及其成员的数据库相关属性(第14章，“ODB
+pragma语言”)。 </p><p class="p">通常，持久类应该定义默认构造函数。生成的数据库支持代码在从持久状态实例化对象时使用此构造函数。如果我们只为数据库支持代码添加默认构造函数，那么我们可以将其设置为私有的，同时我们还设置了odb:：access类，定义在&lt;odb/core.
+hxx&gt;头中，此对象类的友元类。例如： </p><div class="p"><pre class="pre codeblock"><code>#include &lt;odb/core.hxx&gt; 
+
+#pragma db object
+class person
+{
+  ...private:
+  friend class odb::access;
+  person () {}
+};</code></pre></div><p class="p">也可以有一个没有默认构造函数的对象类。但是，在这种情况下，数据库操作只能将持久状态加载到现有实例中(第3.9节“加载持久化对象”，第4.4节“查询结果”)。 </p><p class="p">ODB编译器还需要访问持久类的非瞬态(第14.4.11节，“瞬态”)数据成员。如果这些数据成员是公共的，ODB编译器可以直接访问它们。如果它们是私有的或受保护的，并且odb:：access类被声明为对象类型的友元，那么它也可以这样做。例如： </p><div class="p"><pre class="pre codeblock"><code>#include &lt;odb/core.hxx&gt; 
+#pragma db object
+
+class person
+{
+  ... 
+
+private:
+  friend class odb::access;
+  person () {} 
+
+  #pragma db id
+  unsigned long id_; 
+
+  std::string name_;
+}; </code></pre></div><p class="p">如果无法直接访问数据成员，那么ODB编译器将尝试自动找到合适的访问器和修改器函数。为了实现这一点，ODB编译器将尝试查找从数据成员名称派生的公共访问器和修饰符名称。具体地说，对于上面示例中的name_
+数据成员，ODB编译器将查找具有以下名称的访问器函数：get_name()、getName()、getName()和 name()，以及具有以下名称的修改器函数：set_name()、setName()、setName()和
+name()。您还可以使用--accessor regex和--modifier regex ODB编译器选项添加对自定义名称派生的支持。有关这些选项的详细信息，请参阅ODB编译器命令行手册。以下示例演示了自动访问器和修改器发现： </p><div class="p"><pre class="pre codeblock"><code>#pragma db object
+
+class person
+{public:
+  person () {} 
+
+  ... 
+
+  unsigned long id () constvoid id (unsigned long);const std::string&amp; get_name () const;
+  std::string&amp; set_name (); 
+
+private:#pragma db idunsignedlong id_; // Uses id() for access. 
+std::string name_; // Uses get_name()/set_name() for access.
+};</code></pre></div><p class="p">最后，如果数据成员不能直接访问，并且ODB编译器无法发现合适的访问器和修饰符函数，那么我们可以使用db
+get和db set pragmas提供自定义访问器和修饰符表达式。有关自定义访问器和修饰符表达式的更多信息，请参阅第14.4节。5，“获取/设置/访问”。 </p><p class="p">持久类的数据成员也可以拆分为单独加载和/或单独更新的部分。有关此功能的更多信息，请参阅第9章“Sections”。 </p><p class="p">您可能想知道我们是否还必须将值类型声明为持久的。对于简单的值类型，例如int或std:：string，我们不需要做任何特殊的操作，因为ODB编译器知道如何将它们映射到合适的数据库类型，以及如何在两者之间进行转换。另一方面，如果ODB编译器不知道一个简单的值，那么我们将需要提供到数据库类型的映射，可能还需要提供在两者之间转换的代码。有关如何实现此目的的更多信息，请参阅第14.3节中的db类型db
+type pragma。 </p><p class="p">与对象类类似，复合值类型必须使用db value pragma显式声明为持久，例如： </p><div class="p"><pre class="pre codeblock"><code>#pragma db value
+class name
+{
+  ... 
+
+  std::string first_;
+  std::string last_;
+}; </code></pre></div><p class="p">请注意，复合值不能将数据成员指定为对象id，因为正如我们前面所讨论的，值没有标识的概念。复合值类型也不必定义默认构造函数，除非它用作容器的元素。ODB编译器使用与对象类型相同的机制来访问复合值类型中的数据成员。第7.2节“复合值类型”详细讨论了复合值类型。 </p></section>
+<section class="section"><h2 class="title sectiontitle">3.3 对象和视图指针</h2><p class="p">正如我们在前一章中所看到的，一些数据库操作创建动态分配的持久类实例，并返回指向这些实例的指针。我们将在后面的章节中看到，指针还用于建立对象之间的关系(第6章“关系”)，以及在会话中缓存持久对象(第11章“会话”)。虽然在大多数情况下，您不需要处理指向视图的指针，但可以使用result_iterator::load()函数(第4.4节“查询结果”)获取动态分配的视图实例。 </p><p class="p">默认情况下，所有这些机制都使用原始指针返回对象和视图，以及传递和缓存对象。对于具有简单对象生存期要求且不使用会话或对象关系的应用程序，这通常就足够了。特别是，作为原始指针从数据库操作返回的动态分配的对象或视图可以分配给我们选择的智能指针，例如C++11中的std:：auto_ptr、std:：unique_ptr或TR1、C++11或Boost中的shared_ptr。 </p><p class="p">但是，为了避免任何错误的可能性，例如忘记对返回的对象或视图使用智能指针，以及简化更高级ODB功能(如会话和双向对象关系)的使用，建议使用具有共享语义的智能指针作为对象指针。来自TR1、C++11或Boost的shared_ptr智能指针是一个很好的默认选择。但是，如果不需要共享且不使用会话，则也可以使用std::unique_ptr或std::auto_ptr。 </p><p class="p">ODB提供了几种更改对象或视图指针类型的机制。要基于每个对象或每个视图指定指针类型，我们可以使用db pointer pragma，例如： </p><div class="p"><pre class="pre codeblock"><code>#pragma db object pointer(std::tr1::shared_ptr)
+class person
+{
+  ...
+};</code></pre></div><p class="p">我们还可以在命名空间级别为一组对象或视图指定默认指针： </p><div class="p"><pre class="pre codeblock"><code>#pragma db namespace pointer(std::tr1::shared_ptr)
+namespaceaccounting
+{#pragmadb objectclassemployee
+  {
+    ...
+  };#pragmadb objectclass employer
+  {
+    ...
+  };
+}</code></pre></div><p class="p">最后，我们可以使用--default pointer选项为整个文件指定默认指针。有关此选项参数的详细信息，请参阅ODB编译器命令行手册。典型用法如下所示： </p><p class="p">--default-pointer std::tr1::shared_ptr</p><p class="p">此方法的另一种替代方法具有相同的效果，即为全局命名空间指定默认指针： </p><p class="p">#pragma db namespace() pointer(std::tr1::shared_ptr)</p><p class="p">请注意，我们始终可以使用db
+pointer对象或view pragma覆盖在命名空间级别指定的默认指针，或使用命令行选项。例如： </p></section>
+<section class="section"><pre class="pre codeblock"><code>#pragma db object pointer(std::shared_ptr)
+namespaceaccounting
+{#pragmadb objectclassemployee
+  {
+    ...
+  };#pragmadb object pointer(std::unique_ptr)class employer
+  {
+    ...
+  };
+}</code></pre><p class="p">参考第14.1.2，“指针(对象)”，第14.2.4，“指针(视图)”和第14.5.1，“指针(名称空间)”，了解有关这些机制的更多信息。 </p><p class="p">ODB运行时库提供的内置支持允许我们使用shared_ptr(TR1或C++11)、std:：unique_ptr(C++11)或std:：auto_ptr作为指针类型。另外，ODB概要文件库可用于常用的框架和库(如Boost和Qt)，为这些框架和库中的智能指针提供支持(第三部分，“概要文件”)。还可以很容易地添加对我们自己的智能指针的支持，如第6.5节“使用自定义智能指针”所述。 </p></section>
+<section class="section"><h2 class="title sectiontitle">3.4 数据库</h2><p class="p">在应用程序可以使用ODB提供的持久性服务之前，它必须创建一个数据库类实例。数据库实例表示应用程序存储其持久对象的位置。我们通过实例化一个特定于数据库系统的类来创建一个数据库实例。例如，odb::mysql::database就是mysql数据库系统的此类。我们通常还会将数据库名称作为参数传递给类的构造函数。下面的代码片段显示了如何为MySQL数据库系统创建数据库实例： </p><p class="p"></p><p class="p">#include &lt;odb/database.hxx&gt;</p><p class="p">#include &lt;odb/mysql/database.hxx&gt; </p><p class="p">auto_ptr&lt;odb::database&gt; db (</p><p class="p">&nbsp; new odb::mysql::database
+(</p><p class="p">&nbsp;&nbsp;&nbsp; "test_user"&nbsp;&nbsp;&nbsp;&nbsp; //
+database login name</p><p class="p">&nbsp;&nbsp;&nbsp; "test_password" // database
+password</p><p class="p">&nbsp;&nbsp;&nbsp; "test_database" // database name</p><p class="p">&nbsp;&nbsp;&nbsp; ));</p><p class="p">odb::database是odb提供的所有数据库系统特定类的公共接口。您通常会通过此接口处理数据库实例，除非您的应用程序依赖于特定的功能，并且该功能仅由特定系统的数据库类公开。您需要包括&lt;odb/database.hxx&gt;头文件，使该类在应用程序中可用。 </p><p class="p">数据库接口定义了用于启动事务和操作持久对象的函数。这些将在本章的其余部分以及下一章中详细讨论，下一章将专门讨论查询数据库中持久对象的主题。有关系统特定数据库类的详细信息，请参阅第二部分“数据库系统”。 </p><p class="p">在持久化对象之前，必须在数据库中创建相应的数据库模型。模型包含表定义和其他关系数据库工件，用于存储数据库中持久对象的状态。 </p><p class="p">有几种方法可以创建数据库模型。最简单的方法是指示ODB编译器从持久类(--generate-schema选项)生成相应的模型。ODB编译器可以生成模型作为独立SQL文件，嵌入到生成的C++代码中，或者作为单独的C++源文件(模型模型选项)。如果我们使用SQL文件来创建数据库模型，那么这个文件应该在应用程序启动之前执行，通常只执行一次。 </p><p class="p">或者，如果模型直接嵌入生成代码中或作为单独的C++源文件生成，那么我们可以使用odb::schema_catalog类来在数据库中从我们的应用程序中创建它，例如： </p><p class="p">#include &lt;odb/schema-catalog.hxx&gt; </p><p class="p">odb::transaction t
+(db-&gt;begin ());</p><p class="p">odb::schema_catalog::create_schema (*db);</p><p class="p">t.commit ();</p><p class="p">有关odb:：transaction类的信息，请参阅下一节。上述代码片段的完整版本可在odb-example包的schema/embedded示例中获得。 </p><p class="p">odb::schema_catalog类具有以下接口。您需要包括&lt;odb/schema-catalog.hxx&gt; 头文件，使该类在应用程序中可用。 </p><p class="p"></p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; class schema_catalog</p><p class="p">&nbsp; {</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp; static
+void</p><p class="p">&nbsp;&nbsp;&nbsp; create_schema (database&amp;,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const std::string&amp; name = "",</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+bool drop = true); </p><p class="p">&nbsp;&nbsp;&nbsp; static void</p><p class="p">&nbsp;&nbsp;&nbsp;
+drop_schema (database&amp;, const std::string&amp; name = ""); </p><p class="p">&nbsp;&nbsp;&nbsp; static bool</p><p class="p">&nbsp;&nbsp;&nbsp; exists
+(database_id, const std::string&amp; name = "");</p><p class="p">&nbsp;&nbsp;&nbsp;
+static bool</p><p class="p">&nbsp;&nbsp;&nbsp; exists (const database&amp;,
+const std::string&amp; name = "")</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p">create_schema()函数的第一个参数是要在其中创建模型的数据库实例。第二个参数是模型名称。默认情况下，ODB编译器使用默认模型名称(空字符串)生成所有嵌入式模型。但是，如果您的应用程序需要有多个单独的模型，则可以使用--schema
+name ODB 编译选项来分配自定义模型名称，然后将这些名称用作create_schema()的第二个参数。默认情况下，create_schema()还将删除所有数据库对象(表、索引等)，如果它们在创建新对象之前存在。您可以通过传递false作为第三个参数来更改此行为。drop_schema()函数允许您删除所有数据库对象，而无需创建新对象。</p><p class="p">如果找不到架构，create_schema()和drop_schema()函数将抛出odb:：unknown_schema异常。可以使用exists()函数检查目录中是否存在指定数据库和具有指定名称的架构。还请注意，应该在事务中调用create_schema()和drop_schema()函数。 </p><p class="p">ODB还提供对数据库模型演化的支持。与架构创建类似，模型迁移语句可以作为独立SQL文件生成，也可以嵌入到生成的C++代码中。有关模型演化支持的更多信息，请参阅第13章“数据库模型演化”。 </p><p class="p">最后，我们还可以在ODB中使用自定义数据库模型。除了数据库模型是手工编写或由另一个程序生成之外，这种方法的工作原理与上述独立SQL文件类似。或者我们可以执行自定义SQL语句，直接从应用程序创建模型。为了将持久类映射到自定义数据库模型，ODB提供了一系列映射自定义pragmas，例如db
+table、db column和db type(第14章，“ODB Pragma Language”)。对于显示如何为各种C++构造执行这种映射的示例代码，请参阅odb-examples包中的schema/custom示例。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.5 交易</h2><p class="p">&nbsp;</p><p class="p">事务是原子的、一致的、隔离的和持久的(ACID)工作单元。数据库操作只能在事务中执行，应用程序中的每个执行线程一次只能有一个活动事务。 </p><p class="p">原子性是指在事务中对数据库状态进行更改时，要么应用所有更改，要么根本不应用任何更改。例如，考虑在代表银行账户的两个对象之间转移资金的交易。如果第一个对象上的借方函数成功，但第二个对象上的贷方函数失败，则事务将回滚，并且第一个对象的数据库状态保持不变。 </p><p class="p">一致性是指事务必须将数据库中存储的所有对象从一个一致状态转移到另一个一致状态。例如，如果银行帐户对象必须引用person对象作为其所有者，而我们忘记在持久化对象之前设置此引用，则事务将回滚，数据库将保持不变。 </p><p class="p">所谓隔离，我们的意思是，在事务期间对数据库状态所做的更改只有在提交之前和提交之前在该事务内部可见。使用上述银行转账示例，在成功完成贷记操作并提交交易之前，对第一个对象执行的借记操作的结果对其他交易不可见。 </p><p class="p">所谓持久性，我们的意思是，一旦事务被提交，它对数据库状态所做的更改将是永久性的，并且将在诸如应用程序崩溃之类的故障中生存下来。从现在起，改变这种状态的唯一方法是执行并提交另一个事务。 </p><p class="p">通过调用database::begin()或connection::begin()函数启动事务。返回的事务句柄存储在odb:：transaction类的实例中。您需要包含&lt;odb/transaction.hxx&gt;头文件，使该类在应用程序中可用。例如： </p><p class="p">#include &lt;odb/transaction.hxx&gt; </p><p class="p">transaction t (db.begin
+()) </p><p class="p">// Perform database operations. </p><p class="p">t.commit ();</p><p class="p">odb:：transaction类具有以下接口：&nbsp; </p><p class="p">namespace odb</p><p class="p">{</p><p class="p">class transaction</p><p class="p">{</p><p class="p">public:</p><p class="p">typedef odb::database
+database_type;</p><p class="p">typedef odb::connection connection_type;</p><p class="p">explicit</p><p class="p">transaction (transaction_impl*, bool make_current
+= true);</p><p class="p">transaction ();</p><p class="p">void</p><p class="p">reset (transaction_impl*,
+bool make_current = true);</p><p class="p">void</p><p class="p">commit ();</p><p class="p">void</p><p class="p">rollback ();</p><p class="p">database_type&amp;</p><p class="p">database ();</p><p class="p">connection_type&amp;</p><p class="p">connection ();</p><p class="p">bool</p><p class="p">finilized
+() const;</p><p class="p">public:</p><p class="p">static bool</p><p class="p">has_current ();</p><p class="p">static transaction&amp;</p><p class="p">current ();</p><p class="p">static void</p><p class="p">current (transaction&amp;);</p><p class="p">static bool</p><p class="p">reset_current
+();</p><p class="p">// Callback API.</p><p class="p">//</p><p class="p">public:</p><p class="p">...</p><p class="p">};</p><p class="p">}</p><p class="p">commit()函数提交一个事务，rollback()将其回滚。除非事务已完成，即显式提交或回滚，否则事务类的析构函数将在事务实例超出范围时自动回滚它。如果我们尝试提交或回滚已完成的事务，则会引发odb:：transaction_ready_finalized异常。 </p><p class="p">database()访问器返回此事务处理的数据库。类似地，connection()访问器返回该事务所在的数据库连接(第3.6节“连接”)。</p><p class="p">静态的current()访问器返回此线程当前活动的事务。如果没有活动事务，此函数将抛出odb:：not_in_事务异常。我们可以使用has_current()静态函数检查此线程中是否存在有效的事务。 </p><p class="p">事务构造函数中的make_current参数以及static current()修饰符和reset_current()函数为我们提供了对当前活动事务的指定的额外控制。如果我们将false作为make_current参数传递，那么新创建的事务将不会自动成为该线程的活动事务。稍后，我们可以使用static
+current()修饰符将此事务设置为活动事务。reset_current()静态函数用于清除当前活动的事务。这些机制一起支持更高级的用例，例如在同一线程上多路复用两个或多个事务。例如： </p><p class="p">transaction t1 (db1.begin ());&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Active transaction.</p><p class="p">transaction t2 (db2.begin (), false);
+// Not active.</p><p class="p">// Perform database operations on db1.</p><p class="p">transaction::current (t2);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Deactivate t1, activate t2.</p><p class="p">// Perform database operations
+on db2.</p><p class="p">transaction::current (t1);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Switch back to t1.</p><p class="p">// Perform some more database operations
+on db1.</p><p class="p">t1.commit ();</p><p class="p">transaction::current (t2);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Switch to t2.</p><p class="p">// Perform some more database operations on
+db2.</p><p class="p">t2.commit ();</p><p class="p">reset()修饰符允许我们重用同一事务实例来完成多个数据库事务。与析构函数类似，如果当前事务尚未完成，reset()将回滚该事务。默认事务构造函数创建一个最终完成的事务，稍后可以使用reset()初始化该事务。finilized()访问器可用于检查事务是否已完成。下面是我们如何使用此功能提交当前事务，并在每次执行一定数量的数据库操作时启动新事务： </p><p class="p">transaction t (db.begin ());</p><p class="p">for (size_t i (0); i &lt; n;
+++i)</p><p class="p">{</p><p class="p">// Perform a database operation, such as persist
+an object.</p><p class="p">// Commit the current transaction and start a new
+one after</p><p class="p">// every 100 operations.</p><p class="p">//</p><p class="p">if (i % 100
+== 0)</p><p class="p">{</p><p class="p">t.commit ();</p><p class="p">t.reset (db.begin ());</p><p class="p">}</p><p class="p">}</p><p class="p">t.commit ();</p><p class="p">有关事务回调支持的更多信息，请参阅第15.1节“事务回调”。 </p><p class="p">注意，在上面关于原子性、一致性、隔离性和持久性的讨论中，所有这些保证只适用于数据库中对象的状态，而不是应用程序内存中对象的状态。可以回滚事务，但应用程序内存中仍有来自该事务的更改。避免这种潜在不一致性的一种简单方法是仅在事务范围内实例化持久对象。例如，考虑同一事务的这两种实现： </p><p class="p">void</p><p class="p">update_age (database&amp; db, person&amp; p)</p><p class="p">{</p><p class="p">transaction t (db.begin ());</p><p class="p">p.age (p.age () + 1);</p><p class="p">db.update (p);</p><p class="p">t.commit ();</p><p class="p">}</p><p class="p">在上述实现中，如果update()调用失败并回滚事务，则数据库中person对象的状态和应用程序内存中相同对象的状态将不同。现在考虑一个替代的实现，它只在事务的持续时间实例化对象对象： </p><p class="p">void</p><p class="p">update_age (database&amp; db, unsigned long id)</p><p class="p">{</p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;person&gt;
+p (db.load&lt;person&gt; (id));</p><p class="p">p.age (p.age () + 1);</p><p class="p">db.update
+(p);</p><p class="p">t.commit ();</p><p class="p">}</p><p class="p">当然，并非总是可以用这种风格编写应用程序。通常，我们需要从事务中访问和修改应用程序的持久对象状态。在这种情况下，如果事务已回滚且数据库状态保持不变，则尝试回滚对应用程序状态所做的更改可能是有意义的。一种方法是从数据库重新加载对象的状态，例如： </p><p class="p">void update_age (database&amp; db, person&amp; p)</p><p class="p">{</p><p class="p">try</p><p class="p">{</p><p class="p">transaction t (db.begin ());</p><p class="p">p.age (p.age
+() + 1);</p><p class="p">db.update (p);</p><p class="p">t.commit ();</p><p class="p">}</p><p class="p">catch
+(...)</p><p class="p">{</p><p class="p">transaction t (db.begin ());</p><p class="p">db.load (p.id
+(), p);</p><p class="p">t.commit ();</p><p class="p">throw;</p><p class="p">}</p><p class="p">}</p><p class="p">另请参见第15.1节“事务回调”，了解替代方法。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.6 连接</h2><p class="p">odb::connection类表示到数据库的连接。通常，您不会直接使用连接，而是让ODB运行时根据需要获取和释放连接。但是，某些用例可能需要手动获取连接。为了完整起见，本节描述了connection类并讨论了它的一些用例。如果您是第一次阅读本手册，您可能希望跳过本节。 </p><p class="p">与odb:：database类似，odb:：connection类是odb提供的所有数据库系统特定类的公共接口。有关系统特定连接类的详细信息，请参阅第二部分“数据库系统”。 </p><p class="p">要使odb:：connection类在应用程序中可用，您需要包含&lt;odb/connection.hxx&gt;头文件。odb:：connection类具有以下接口： </p><div class="p"><pre class="pre codeblock"><code>namespaceodb
+{classconnection
+  {public:
+    typedef odb::database database_type;
+
+    transaction
+    begin () = 0;
+
+    unsigned long longexecute (const char* statement);
+
+    unsigned long longexecute (const std::string&amp; statement);
+
+    unsigned long longexecute (const char* statement, std::size_t length);
+
+    database_type&amp;database ();
+  };
+
+  typedef details::shared_ptr&lt;connection&gt; connection_ptr;
+}</code></pre></div><p class="p">函数用于启动连接上的事务。 execute()函数允许我们在连接上执行本机数据库语句。它们的语义与database:：execute()函数(第3.12节，“执行本机SQL语句”)相同，只是它们可以在事务外部合法调用。最后，database()访问器返回对此连接所对应的odb::database实例的引用。 </p><p class="p">为了获得连接，我们调用database:：connection()函数。该连接作为odb:：connection_ptr返回，它是一个具有共享指针语义的特定于实现的智能指针。这尤其意味着可以从函数中复制和返回连接指针。一旦指向同一连接的connection_ptr的最后一个实例被破坏，该连接将返回到数据库实例。以下代码片段显示了如何获取、使用和释放连接： </p><div class="p"><pre class="pre codeblock"><code>using namespace odb::core;
+
+database&amp; db = ...
+connection_ptr c (db.connection ());
+
+// Temporarily disable foreign key constraints.//c-&gt;execute ("SET FOREIGN_KEY_CHECKS = 0");
+
+// Start a transaction on this connection.//transaction t (c-&gt;begin ());
+...
+t.commit ();
+
+// Restore foreign key constraints.//c-&gt;execute ("SET FOREIGN_KEY_CHECKS = 1");
+
+// When 'c' goes out of scope, the connection is returned to 'db'.</code></pre></div><p class="p">一些可能需要直接操纵连接的用例包括事务外语句执行，例如连接配置语句的执行、每个线程连接策略的实现，以及确保在同一连接上执行一组事务。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.7 错误处理与恢复</h2><p class="p">ODB使用C++异常报告数据库操作错误。大多数ODB异常表示硬错误或在没有应用程序干预的情况下无法更正的错误。例如，如果我们试图加载一个对象id未知的对象，就会抛出odb::object_not_persistent异常。例如，我们的应用程序可以通过获取有效的对象id并重试来纠正此错误。每个数据库函数可能引发的硬错误和相应的ODB异常在本章的其余部分进行了描述，第3.14节“ODB异常”提供了所有ODB异常的快速参考。 </p><p class="p">第二组ODB异常表示软错误或可恢复错误。这些错误是暂时的故障，通常可以通过简单地重新执行事务来纠正。ODB定义了三个这样的异常：ODB:：connection_lost、ODB:：timeout和ODB:：deadlock。所有可恢复的ODB异常都派生自公共ODB:：recoverable
+base exception，该异常可用于使用单个catch块处理所有可恢复条件。 </p><p class="p">odb::connection_lost如果在事务的中间丢失了与数据库的连接，则抛出连接丢失的异常。在这种情况下，事务被中止，但可以在不做任何更改的情况下重新尝试。类似地，如果其中一个数据库操作或整个事务超时，将引发odb:：timeout异常。同样，在这种情况下，事务被中止，但可以按原样重新尝试。 </p><p class="p">如果两个或多个事务访问或修改多个对象，并且由不同的应用程序或同一应用程序中的不同线程并发执行，则这些事务可能会尝试以不兼容的顺序访问对象并导致死锁。死锁的典型示例是两个事务，其中第一个事务修改了object1，并等待第二个事务将其更改提交给object2，以便它也可以更新object2。同时，第二个事务已经修改了object2，并且正在等待第一个事务将其更改提交给object1，因为它还需要修改object1。因此，这两项交易都无法完成。 </p><p class="p">数据库系统检测到这种情况，并自动中止其中一个死锁事务中的等待操作。在ODB中，这将转换为从一个数据库函数引发的odb::deadlock可恢复异常。 </p><p class="p">以下代码片段显示了如何通过重新启动受影响的事务来处理可恢复异常：</p><div class="p"><pre class="pre codeblock"><code>const unsigned short max_retries = 5for (unsigned short retry_count (0); ; retry_count++)
+{try{
+    transaction t (db.begin ());
+
+    ...
+
+    t.commit ();break;
+  }catch (const odb::recoverable&amp;e)
+  {if (retry_count &gt;max_retries)throwretry_limit_exceeded (e.what ());elsecontinue;
+  }
+}</code></pre></div></section>
+<section class="section"><h2 class="title sectiontitle">3.8 使对象持久化</h2><p class="p">新创建的持久类实例是暂时的。我们使用database:：persist()函数模板使临时实例持久化。此函数有四个重载版本，具有以下签名：&nbsp; </p><div class="p"><pre class="pre codeblock"><code>template &lt;typename T&gt;
+typename object_traits&lt;T&gt;::id_type
+  persist (const T&amp; object);
+
+  template &lt;typename T&gt;
+typename object_traits&lt;T&gt;::id_type
+  persist (const object_traits&lt;T&gt;::const_pointer_type&amp; object);
+
+  template &lt;typename T&gt;
+typename object_traits&lt;T&gt;::id_type
+  persist (T&amp; object);
+
+  template &lt;typename T&gt;
+typename object_traits&lt;T&gt;::id_type
+  persist (const object_traits&lt;T&gt;::pointer_type&amp; object);</code></pre></div><p class="p">在本手册的此处和其余部分中，object_traits&lt;T&gt;::pointer_type 和object_traits&lt;T&gt;::const_pointer_type
+分别表示无限制和常量对象指针类型(第3.3节，“对象和视图指针”)。类似地，object_traits&lt;T&gt;::id_type表示对象id类型。odb:：object_traits模板是odb编译器生成的数据库支持代码的一部分。 </p><p class="p">第一个persist()函数需要一个对正在持久化的实例的常量引用。第二个函数需要一个常量对象指针。这两种功能只能用于具有应用程序指定对象ID的对象(第14.4.2节“自动”)。 </p><p class="p">第二个和第三个persist()函数与前两个类似，只是它们在不受限制的引用和对象指针上操作。如果要持久化的对象的标识符由数据库分配，则这些函数将使用分配的值更新传递的实例的id成员。所有四个函数都返回新持久化对象的对象id。 </p><p class="p">如果数据库已包含具有此标识符的此类型的对象，则persist()函数将抛出odb::object_already_persistent异常。只要持久化的对象数不超过id类型的值空间，数据库分配的对象id就永远不会发生这种情况。 </p><p class="p">调用persist()函数时，我们不需要显式指定模板类型，因为它将从传递的参数自动推断出来。以下示例显示了如何调用这些函数： </p><div class="p"><pre class="pre codeblock"><code>person john ("John", "Doe", 33);
+shared_ptr&lt;person&gt; jane (new person ("Jane", "Doe", 32));
+
+transaction t (db.begin ());
+
+db.persist (john);
+unsigned long jane_id (db.persist (jane));
+
+t.commit ();
+
+cerr &lt;&lt; "Jane's id: " &lt;&lt; jane_id &lt;&lt; endl;</code></pre></div><p class="p">请注意，在上面的代码片段中，我们创建了一些实例，我们计划在启动事务之前将这些实例持久化。同样，我们在提交交易后打印了Jane的id。一般来说，您应该避免在事务范围内执行可以在事务开始之前或终止之后执行的操作。活动事务既消耗应用程序的资源(如数据库连接)，也消耗数据库服务器的资源(如对象锁)。通过遵循上述规则，您可以确保尽快释放这些资源，并将其提供给应用程序中的其他线程和其他应用程序。 </p><p class="p">一些数据库系统支持使用单个底层语句执行持久化多个对象，这可以显著提高性能。对于这样的数据库系统，ODB提供了大容量persist()函数。有关详细信息，请参阅第15.3节“批量数据库操作”。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.9 加载持久对象</h2><p class="p">一旦一个对象被持久化，并且您知道它的对象id，应用程序就可以使用database:：load()函数模板加载它。此函数有两个重载版本，具有以下签名：</p><p class="p">&nbsp;template &lt;typename T&gt;</p><p class="p">&nbsp; typename object_traits&lt;T&gt;::pointer_type</p><p class="p">&nbsp; load (const typename object_traits&lt;T&gt;::id_type&amp;
+id);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; load (const typename object_traits&lt;T&gt;::id_type&amp; id,
+T&amp; object);</p><p class="p">给定对象id，第一个函数在动态内存中分配对象类的新实例，从数据库加载其状态，并返回指向新实例的指针。第二个函数将对象的状态加载到现有实例中。如果数据库中没有具有此id的此类对象，则这两个函数都会抛出odb:：object_not_persistent。 </p><p class="p">调用第一个load()函数时，需要显式指定对象类型。对于第二个函数，我们不需要这样做，因为对象类型将从第二个参数自动推断，例如： </p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;person&gt; jane (db.load&lt;person&gt;
+(jane_id));</p><p class="p">db.load (jane_id, *jane);</p><p class="p">t.commit ();</p><p class="p">在某些情况下，可能需要从数据库重新加载对象的状态。虽然使用第二个load()函数很容易实现，但ODB提供了具有许多特殊属性的database:：reload()函数模板。此函数有两个重载版本，具有以下签名：</p><p class="p">&nbsp;template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp;
+reload (T&amp; object);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; reload (const object_traits&lt;T&gt;::pointer_type&amp;
+object);</p><p class="p">第一个reload()函数需要一个对象引用，而第二个函数需要一个对象指针。这两个函数都希望传递的对象中的id成员包含有效的对象标识符，并且与load()类似，如果数据库中没有具有此id的此类对象，则这两个函数都将抛出odb:：object_not_persistent。 </p><p class="p">与load()函数相比，reload()的第一个特殊属性是它不与会话的对象缓存交互(第11.1节“对象缓存”)。也就是说，如果正在重新加载的对象已经在缓存中，那么在reload()返回后，它将保留在缓存中。类似地，如果对象不在缓存中，则reload()也不会将其放在缓存中。 </p><p class="p">reload()函数的第二个特殊属性仅在对具有开放式并发模型的对象进行操作时才显示出来。在这种情况下，如果应用程序内存和数据库中对象的状态相同，则不会重新加载。有关开放式并发的更多信息，请参阅第12章“开放式并发”。 </p><p class="p">如果我们不确定具有给定id的对象是否是持久的，我们可以使用find()函数而不是load()，例如： </p><p class="p">template
+&lt;typename T&gt;</p><p class="p">&nbsp; typename object_traits&lt;T&gt;::pointer_type</p><p class="p">&nbsp; find (const typename object_traits&lt;T&gt;::id_type&amp;
+id);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; bool</p><p class="p">&nbsp; find (const typename object_traits&lt;T&gt;::id_type&amp; id,
+T&amp; object);</p><p class="p">如果在数据库中找不到具有此id的对象，则第一个find()函数将返回空指针，而第二个函数将不修改传递的实例并返回false。 </p><p class="p">如果我们不知道对象id，那么我们可以使用查询来查找与某些条件匹配的对象(或多个对象)(第4章，“查询数据库”)。但是，请注意，使用对象的标识符加载对象的状态可能比执行查询快得多。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.10 更新持久对象</h2><p class="p">如果修改了持久对象，我们可以使用database:：update()函数模板将更新的状态存储在数据库中。此函数有三个重载版本，具有以下签名：&nbsp;&nbsp; </p><p class="p">template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; update
+(const T&amp; object);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; update (const object_traits&lt;T&gt;::const_pointer_type&amp;
+object);</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; update (const object_traits&lt;T&gt;::pointer_type&amp; object);</p><p class="p">第一个update()函数需要一个对象引用，而其他两个函数需要对象指针。如果传递给其中一个函数的对象在数据库中不存在，update()将抛出odb::object_not_persistent异常(但请参见下面关于乐观并发性的说明)。 </p><p class="p">下面是我们在前面的交易部分中讨论的资金转移示例。它使用假设的银行账户持久类： </p><p class="p">void</p><p class="p">transfer
+(database&amp; db,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+unsigned long from_acc,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+unsigned long to_acc,</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+unsigned int amount)</p><p class="p">{</p><p class="p">&nbsp; bank_account from, to;</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.load (from_acc,
+from);</p><p class="p">&nbsp; if (from.balance () &lt; amount)</p><p class="p">&nbsp;&nbsp;&nbsp;
+throw insufficient_funds ();</p><p class="p">&nbsp; db.load (to_acc, to);</p><p class="p">&nbsp; to.balance (to.balance () + amount);</p><p class="p">&nbsp; from.balance
+(from.balance () - amount);</p><p class="p">&nbsp; db.update (to);</p><p class="p">&nbsp;
+db.update (from);</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">使用动态分配的对象和带有对象指针参数的update()函数也可以实现这一点，例如： </p><p class="p">transaction t (db.begin ());</p><p class="p">shared_ptr&lt;bank_account&gt;
+from (db.load&lt;bank_account&gt; (from_acc));</p><p class="p">if (from-&gt;balance
+() &lt; amount)</p><p class="p">&nbsp; throw insufficient_funds ();</p><p class="p">shared_ptr&lt;bank_account&gt;
+to (db.load&lt;bank_account&gt; (to_acc));</p><p class="p">to-&gt;balance (to-&gt;balance
+() + amount);</p><p class="p">from-&gt;balance (from-&gt;balance () - amount);</p><p class="p">db.update (to);</p><p class="p">db.update (from);</p><p class="p">t.commit ();</p><p class="p">如果任何update()函数都在具有乐观并发模型的持久类上运行，那么如果数据库中的对象自上次加载到应用程序内存后状态发生了更改，则它们将抛出odb:：object_changed异常。此外，对于这样的类，如果数据库中没有这样的对象，update()不再抛出object_not_persistent异常。相反，此条件被视为对象状态的更改，而抛出object_changed。有关乐观并发的更详细讨论，请参阅第12章“乐观并发”。 </p><p class="p">在ODB中，可以将持久类、复合值类型以及单个数据成员声明为只读(请参阅第14.1.4节“只读(对象)”，第14.3节)。6，“只读(复合值)”和第14.4节。12，“只读(数据成员)”。 </p><p class="p">如果将单个数据成员声明为只读，则在使用上述任何update()函数更新对象的数据库状态时，将忽略对此成员所做的任何更改。常量数据成员将自动视为只读。如果复合值声明为只读，则其所有数据成员都将被视为只读。 </p><p class="p">如果整个对象声明为只读，则无法更改此对象的数据库状态。为此类对象调用上述任何update()函数都将导致编译时错误。 </p><p class="p">与persist()类似，对于支持此功能的数据库系统，ODB提供了bulk update()函数。有关详细信息，请参阅第15.3节“批量数据库操作”。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.11 删除持久对象</h2><p class="p">要从数据库中删除持久对象的状态，我们使用database:：erase()或database:：erase_query()函数模板。如果应用程序仍有已擦除对象的实例，则该实例将变为临时的。erase()函数具有以下重载版本： </p><p class="p">template &lt;typename T&gt;</p><p class="p">void</p><p class="p">erase (const T&amp;
+object);</p><p class="p">template &lt;typename T&gt;</p><p class="p">void</p><p class="p">erase (const
+object_traits&lt;T&gt;::const_pointer_type&amp; object);</p><p class="p">template
+&lt;typename T&gt;</p><p class="p">void</p><p class="p">erase (const object_traits&lt;T&gt;::pointer_type&amp;
+object);</p><p class="p">template &lt;typename T&gt;</p><p class="p">void</p><p class="p">erase (const
+typename object_traits&lt;T&gt;::id_type&amp; id);</p><p class="p">第一个erase()函数使用对象本身(以对象引用的形式)从数据库中删除其状态。接下来的两个函数使用对象指针实现相同的结果。请注意，所有三个函数都保持传递的对象不变。它只是变得短暂。最后一个函数使用对象id标识要删除的对象。如果对象在数据库中不存在，那么所有四个函数都会抛出odb::object_not_persistent异常(但请参见下面关于乐观并发性的说明)。 </p><p class="p">调用最后一个erase()函数时，必须指定对象类型。前三个函数也不需要这样做，因为对象类型将自动从它们的参数中推导出来。以下示例显示了如何调用这些函数： </p><p class="p">person&amp; john = ...</p><p class="p">shared_ptr&lt;jane&gt; jane = ...</p><p class="p">unsigned long joe_id = ...</p><p class="p">transaction t (db.begin ());</p><p class="p">db.erase (john);</p><p class="p">db.erase (jane);</p><p class="p">db.erase&lt;person&gt;
+(joe_id);</p><p class="p">t.commit ();</p><p class="p">如果除最后一个函数外的任何erase()函数都在具有乐观并发模型的持久类上运行，那么如果数据库中对象的状态自上次加载到应用程序内存以来发生了更改，则它们将抛出odb:：object_changed异常。此外，对于此类类，如果数据库中没有此类对象，则erase()不再抛出object_not_persistent异常。相反，此条件被视为对象状态的更改，而抛出object_changed。有关乐观并发的更详细讨论，请参阅第12章“乐观并发”。 </p><p class="p">与persist()和update()类似，对于支持此功能的数据库系统，ODB提供了批量erase()函数。有关详细信息，请参阅第15.3节“批量数据库操作”。 </p><p class="p">erase_query() 函数的作用是：删除符合特定条件的多个对象的状态。它使用database:：query()函数(第4章，“查询数据库”)的查询表达式，并且由于ODB查询功能是可选的，因此只有在指定--generate
+query ODB compiler选项时才可用。erase_query()函数具有以下重载版本： </p><p class="p">template
+&lt;typename T&gt;</p><p class="p">unsigned long long</p><p class="p">erase_query ();</p><p class="p">template &lt;typename T&gt;</p><p class="p">unsigned long long</p><p class="p">erase_query
+(const odb::query&lt;T&gt;&amp;);</p><p class="p">第一个erase_query()函数用于删除数据库中存储的给定类型的所有持久对象的状态。第二个函数使用传递的查询实例仅删除与查询条件匹配的对象的状态。这两个函数都返回已擦除的对象数。调用erase_query()函数时，必须显式指定要擦除的对象类型。例如： </p><p class="p">typedef odb::query&lt;person&gt; query;</p><p class="p">transaction t (db.begin
+());</p><p class="p">db.erase_query&lt;person&gt; (query::last == "Doe" &amp;&amp;
+query::age &lt; 30);</p><p class="p">t.commit ();</p><p class="p">与query()函数不同，在调用erase_query()时，我们不能在查询表达式中使用指向对象的成员。但是，我们仍然可以将指针对应的成员用作具有指向对象id类型的普通对象成员(第6章“关系”)。这允许我们比较对象ID以及测试指针是否为空。例如，下面的事务确保引用将要删除的雇主对象的所有employee对象也被删除。这里我们假设employee类包含指向employer类的指针。有关这些类别的完整定义，请参阅第6章“关系”。 </p><p class="p">typedef odb::query&lt;employee&gt; query;</p><p class="p">transaction t (db.begin
+());</p><p class="p">employer&amp; e = ... // Employer object to be deleted.</p><p class="p">db.erase_query&lt;employee&gt; (query::employer == e.id ());</p><p class="p">db.erase (e);</p><p class="p">t.commit ();</p></section>
+<section class="section"><h2 class="title sectiontitle">3.12 执行原生 SQL 语句</h2><p class="p">在某些情况下，我们可能需要执行本机SQL语句，而不是使用上述面向对象的数据库API。例如，我们可能希望优化ODB编译器生成的数据库模型，或者利用特定于我们正在使用的数据库系统的特性。database:：execute()函数有三个重载版本，提供以下功能： </p><p class="p">unsigned long long</p><p class="p">execute (const char* statement);</p><p class="p">unsigned long long</p><p class="p">execute (const std::string&amp; statement);</p><p class="p">unsigned long long</p><p class="p">execute (const char* statement, std::size_t
+length)</p><p class="p">函数的第一个execute()函数希望SQL语句是以零结尾的C字符串。最后一个版本要求将显式语句长度作为第二个参数，并且语句本身可能包含“\0”字符，例如，用于表示二进制数据(如果数据库系统支持)。这三个函数都返回受语句影响的行数。例如：</p><p class="p">transaction t (db.begin ());</p><p class="p">db.execute ("DROP TABLE test");</p><p class="p">db.execute ("CREATE TABLE test (n INT PRIMARY KEY)");</p><p class="p">t.commit
+();</p><p class="p">虽然必须始终在事务内调用这些函数，但可能需要在事务外执行本机语句。这可以使用第3.6节“连接”中描述的connection:：execute()函数来完成。</p></section>
+<section class="section"><h2 class="title sectiontitle">3.13 跟踪 SQL 语句执行</h2><p class="p">通常，了解高级数据库操作所执行的SQL语句是有用的。例如，我们可以使用这些信息来找出为什么某些事务不能产生预期的结果，或者为什么它们花费的时间比预期的要长。 </p><p class="p">虽然这些信息通常可以从数据库日志中获得，但ODB提供了一种应用程序端SQL语句跟踪支持，这种支持更方便、粒度更细。例如，在需要跟踪的典型情况下，我们希望看到SQL语句作为特定事务的结果执行。虽然从数据库日志中提取这样的语句子集可能很困难，但使用ODB跟踪支持很容易实现：</p><p class="p">transaction t (db.begin ());</p><p class="p">t.tracer (stderr_tracer);</p><p class="p">...</p><p class="p">t.commit ();</p><p class="p">ODB允许我们在数据库、连接和事务级别上指定跟踪程序。如果为数据库指定，则将跟踪在此数据库上执行的所有语句。另一方面，如果为连接指定了跟踪程序，则只跟踪在此连接上执行的SQL语句。类似地，为事务指定的跟踪程序将仅显示作为该事务一部分执行的语句。所有三个类(odb:：database、odb:：connection和odb:：transaction)都提供相同的跟踪API：&nbsp;&nbsp; </p><p class="p">void</p><p class="p">&nbsp; tracer (odb::tracer&amp;);</p><p class="p">&nbsp; void</p><p class="p">&nbsp; tracer (odb::tracer*);</p><p class="p">&nbsp; odb::tracer*</p><p class="p">&nbsp; tracer () const;</p><p class="p">前两个tracer()函数允许我们设置tracer对象，第二个函数允许我们通过传递空指针清除当前跟踪器。最后一个tracer()函数允许我们获取当前跟踪对象。如果没有有效的跟踪程序，则返回空指针。请注意，跟踪API不管理跟踪对象的生存期。跟踪器在使用期间应一直有效。此外，跟踪API不是线程安全的。尝试同时从多个线程设置跟踪程序将导致未定义的行为。 </p><p class="p">跟踪程序类定义了一个回调接口，可用于创建自定义跟踪程序实现。odb::stderr_tracer和odb::stderr_full_tracer是odb运行时提供的内置跟踪器实现。它们都将正在执行的SQL语句打印到标准错误流中。完整跟踪程序除了跟踪语句执行外，还跟踪它们的准备和释放。如果语句(例如自定义查询)包含语法错误，则完整跟踪程序可能特别有用。在这种情况下，将在准备过程中检测到错误，因此，该语句将永远不会执行。查看此类语句的唯一方法是使用完整跟踪。 </p><p class="p">在&lt;odb/tracer.hxx&gt;头文件中定义了odb:：tracer类，您需要将其包括在内，以使该类在应用程序中可用。odb:：tracer接口提供了以下回调函数： </p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; class tracer</p><p class="p">&nbsp; {</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp; virtual void</p><p class="p">&nbsp;&nbsp;&nbsp;
+prepare (connection&amp;, const statement&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+virtual void</p><p class="p">&nbsp;&nbsp;&nbsp; execute (connection&amp;, const
+statement&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; virtual void</p><p class="p">&nbsp;&nbsp;&nbsp;
+execute (connection&amp;, const char* statement) = 0;</p><p class="p">&nbsp;&nbsp;&nbsp;
+virtual void</p><p class="p">&nbsp;&nbsp;&nbsp; deallocate (connection&amp;,
+const statement&amp;);</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p">分别在创建和销毁准备好的语句时调用prepare()和deallocate()函数。第一个execute()函数在执行准备好的语句时调用，第二个函数在执行普通语句时调用。prepare()和deallocate()函数的默认实现不执行任何操作，而第一个execute()函数调用第二个函数，并将语句文本作为第二个参数传递。因此，如果您感兴趣的只是正在执行的SQL语句，那么您只需要重写第二个execute()函数。 </p><p class="p">除了常见的odb:：tracer接口外，每个数据库运行时还提供一个特定于数据库的版本，即odb::&lt;database&gt;::tracer。它的接口与普通版本完全相同，只是连接和语句类型是特定于数据库的，这使我们能够访问其他特定于数据库的信息。 </p><p class="p">作为一个例子，考虑一个更详细的、PostgreSQL特定的示踪剂实现。这里我们依赖于这样一个事实，即PostgreSQL ODB运行时使用名称来标识准备好的语句，并且可以从ODB:：pgsql:：statement对象获取此信息： </p><p class="p">#include &lt;odb/pgsql/tracer.hxx&gt;</p><p class="p">#include &lt;odb/pgsql/database.hxx&gt;</p><p class="p">#include &lt;odb/pgsql/connection.hxx&gt;</p><p class="p">#include &lt;odb/pgsql/statement.hxx&gt;</p><p class="p">class pgsql_tracer: public odb::pgsql::tracer</p><p class="p">{</p><p class="p">&nbsp;
+virtual void</p><p class="p">&nbsp; prepare (odb::pgsql::connection&amp; c,
+const odb::pgsql::statement&amp; s)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+cerr &lt;&lt; c.database ().db () &lt;&lt; ": PREPARE " &lt;&lt; s.name
+()</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;&lt;
+" AS " &lt;&lt; s.text () &lt;&lt; endl;</p><p class="p">&nbsp; }</p><p class="p">&nbsp;
+virtual void</p><p class="p">&nbsp; execute (odb::pgsql::connection&amp; c,
+const odb::pgsql::statement&amp; s)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+cerr &lt;&lt; c.database ().db () &lt;&lt; ": EXECUTE " &lt;&lt; s.name
+() &lt;&lt; endl;</p><p class="p">&nbsp; }</p><p class="p">&nbsp; virtual void</p><p class="p">&nbsp;
+execute (odb::pgsql::connection&amp; c, const char* statement)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; cerr &lt;&lt; c.database ().db
+() &lt;&lt; ": " &lt;&lt; statement &lt;&lt; endl;</p><p class="p">&nbsp; }</p><p class="p">&nbsp; virtual void</p><p class="p">&nbsp; deallocate (odb::pgsql::connection&amp;
+c, const odb::pgsql::statement&amp; s)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+cerr &lt;&lt; c.database ().db () &lt;&lt; ": DEALLOCATE " &lt;&lt;
+s.name () &lt;&lt; endl;</p><p class="p">&nbsp; }</p><p class="p">};</p><p class="p">还要注意，只能使用特定于数据库的数据库实例设置特定于数据库的跟踪对象，例如：</p><p class="p">pgsql_tracer tracer;</p><p class="p">odb::database&amp; db = ...;</p><p class="p">db.tracer (tracer); // Compile error.</p><p class="p">odb::pgsql::database&amp;
+db = ...;</p><p class="p">db.tracer (tracer); // Ok.</p><p class="p">&nbsp;</p></section>
+<section class="section"><h2 class="title sectiontitle">3.14 ODB 异常</h2><p class="p">在前面的部分中，我们已经提到了数据库函数可能引发的一些异常。在本节中，我们将讨论ODB异常层次结构，并记录公共ODB运行时可以引发的所有异常。&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </p><p class="p">ODB异常层次结构的根是抽象的ODB:：exception类。此类派生自std:：exception，并具有以下接口： </p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; struct exception: std::exception</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; virtual const char*</p><p class="p">&nbsp;&nbsp;&nbsp;
+what () const throw () = 0;</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p">捕获此异常保证我们将捕获ODB引发的所有异常。函数的作用是：返回触发异常的条件的可读描述。 </p><p class="p">ODB可以引发的具体异常如下所示： </p><div class="p"><pre class="pre codeblock"><code>namespace odb
+{
+  struct null_pointer: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Transaction exceptions.
+  //
+  struct already_in_transaction: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct not_in_transaction: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct transaction_already_finalized: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Session exceptions.
+  //
+  struct already_in_session: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct not_in_session: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct session_required: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Database operations exceptions.
+  //
+  struct recoverable: exception
+  {
+  };
+
+  struct connection_lost: recoverable
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct timeout: recoverable
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct deadlock: recoverable
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct object_not_persistent: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct object_already_persistent: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct object_changed: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct result_not_cached: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct database_exception: exception
+  {
+  };
+
+  // Polymorphism support exceptions.
+  //
+  struct abstract_class: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct no_type_info: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Prepared query support exceptions.
+  //
+  struct prepared_already_cached: exception
+  {
+    const char*
+    name () const;
+
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct prepared_type_mismatch: exception
+  {
+    const char*
+    name () const;
+
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Schema catalog exceptions.
+  //
+  struct unknown_schema: exception
+  {
+    const std::string&amp;
+    name () const;
+
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct unknown_schema_version: exception
+  {
+    schema_version
+    version () const;
+
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Section exceptions.
+  //
+  struct section_not_loaded: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  struct section_not_in_object: exception
+  {
+    virtual const char*
+    what () const throw ();
+  };
+
+  // Bulk operation exceptions.
+  //
+  struct multiple_exceptions: exception
+  {
+    ...
+
+    virtual const char*
+    what () const throw ();
+  };
+}</code></pre></div><p class="p">当指向声明为非null且带有db not_null或db value not_null pragma的持久对象的指针具有null值时，将引发null_pointer异常。详见第6章“关系”。 </p><p class="p">接下来的三个异常(已在事务中、未在事务中、事务已完成)由odb:：transaction类抛出，并在第3.5节“事务”中讨论。 </p><p class="p">接下来的两个异常(已在会话中，而不是会话中)由odb:：session类引发，在第11章“会话”中讨论。 </p><p class="p">当ODB检测到正确加载双向对象关系需要会话但未使用会话时，将引发session_required异常。有关此异常的更多信息，请参见第6.2节“双向关系”。 </p><p class="p">可恢复异常作为所有可恢复异常的公共基础，这些异常包括：连接丢失、超时和死锁。当与数据库的连接丢失时，将引发connection_lost异常。类似地，如果其中一个数据库操作或整个事务超时，将引发超时异常。当数据库系统检测到事务死锁时，将引发死锁异常。这些异常可以由任何数据库函数引发。有关详细信息，请参见第3.7节“错误处理和恢复”。 </p><p class="p">persist()数据库函数引发object_already_persistent异常。有关详细信息，请参见第3.8节“使对象持久化”。 </p><p class="p">load()、update()和erase()数据库函数引发bject_not_persistent异常。有关更多信息，请参阅第3.9节“加载持久对象”、第3.10节“更新持久对象”和第3.11节“删除持久对象”。 </p><p class="p">当对具有乐观并发模型的对象进行操作时，update()数据库函数和某些erase()数据库函数会引发object_changed异常。有关详细信息，请参见第12章“乐观并发”。 </p><p class="p">&nbsp;查询结果类引发result_not_cached异常。详见第4.4节“查询结果”。 </p><p class="p">database_exception
+exception是数据库系统特定运行库引发的所有数据库系统特定异常的基类。有关更多信息，请参阅第二部分“数据库系统”。 </p><p class="p">当我们试图持久化、更新、加载或删除多态抽象类的实例时，数据库函数会引发abstract_class异常。有关抽象类的更多信息，请参阅第14.1节。3，“摘要”。 </p><p class="p">当我们试图持久化、更新、加载或擦除应用程序中不存在类型信息的多态类的实例时，数据库函数会引发no_type_info异常。这通常意味着为此类生成的数据库支持代码尚未链接(或动态加载)到应用程序中，或者鉴别器值尚未映射到持久类。有关多态性支持的更多信息，请参阅第8.2节“多态性继承”。 </p><p class="p">如果已缓存具有指定名称的已准备查询，则cache_query() 函数将引发prepared_already_cached异常。如果指定的准备好的查询对象类型或参数类型与缓存中的类型不匹配，则lookup_query()函数将引发prepared_type_mismatch异常。有关详细信息，请参阅第4.5节“准备好的查询”。 </p><p class="p">如果找不到具有指定名称的架构，odb::schema_catalog类将引发unknown_schema异常。有关详细信息，请参阅第3.4节“数据库”。如果传递的版本未知，则处理数据库模型演变的模型目录函数会引发
+unknown_schema_version异常。有关详细信息，请参阅第13章“数据库模型演变”。 </p><p class="p">如果我们试图更新尚未加载的对象节，将section_not_loaded异常。如果正在加载或更新的节实例不属于相应的对象，则会引发ection_not_in_object异常。有关这些例外情况的更多信息，请参见第9章“章节”。 </p><p class="p">multiple_exceptions _异常由批量API函数引发。有关详细信息，请参阅第15.3节“批量数据库操作”。 </p><p class="p">异常类在&lt;odb/exception.hxx&gt;头文件中定义。所有具体的ODB异常都在&lt;ODB/exceptions.hxx&gt;中定义。也包括&lt;odb/exception.hxx&gt;。通常，您不需要包含这两个头中的任何一个，因为它们是由&lt;odb/database.hxx&gt;自动包含的。但是，如果处理ODB异常的源文件不包含&lt;ODB/database.hxx&gt;，则需要显式包含其中一个标头。</p></section>
+<section class="section"><h2 class="title sectiontitle">参考资料</h2><ol class="ol">
+<li class="li"><p class="p"><a class="xref" href="https://blog.csdn.net/weixin_39345003/article/details/115214762" target="_blank" rel="external noopener">C++ Object Persistence with ODB 学习笔记</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15892692.html" target="_blank" rel="external noopener">3 Working with Persistent Objects ODB使用持久对象</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15796249.html" target="_blank" rel="external noopener">4 ODB Querying the Database ODB数据库查询</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15726012.html" target="_blank" rel="external noopener">5 可供ODB使用的标准容器(5 Containers)</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15801670.html" target="_blank" rel="external noopener">6 ODB Relationships ODB依赖关系</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15726286.html" target="_blank" rel="external noopener">7 ODB 值类型 (Value Types)</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15783062.html" target="_blank" rel="external noopener">8 ODB 继承 (Inheritance)</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15783110.html" target="_blank" rel="external noopener">9 ODB Sections</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15783208.html" target="_blank" rel="external noopener">10 ODB Views 视图</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15783314.html" target="_blank" rel="external noopener">11 ODB Session 会话</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15882492.html" target="_blank" rel="external noopener">12 Optimistic Concurrency ODB 乐观并发</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15891378.html" target="_blank" rel="external noopener">13 Database Schema Evolution 数据库模型演变</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15891752.html" target="_blank" rel="external noopener">14 ODB Pragma Language ODB编程语言</a></p></li>
+<li class="li"><p class="p"><a class="xref" href="https://www.cnblogs.com/CaiNiaoIceLee/p/15892513.html" target="_blank" rel="external noopener">15 Advanced Techniques and Mechanisms ODB高级技术和机制</a></p></li>
+</ol></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>

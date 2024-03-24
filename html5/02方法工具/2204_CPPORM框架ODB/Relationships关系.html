@@ -1,0 +1,496 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>Relationships关系</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="Relationships关系-5E0CE0B6"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">Relationships关系</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">6 关系</h2><p class="p">持久对象之间的关系用指针或指针容器表示。ODB运行时库提供了对shared_ptr/weak_ptr(TR1或C++11)、std::unique_ptr
+(C++11), std::auto_ptr 和原始指针的内置支持。另外，ODB概要文件库可用于常用的框架和库(如Boost和Qt)，为这些框架和库中的智能指针提供支持(第三部分，“概要文件”)。添加对自定义智能指针的支持也很容易，后面将在第6.5节“使用自定义智能指针”中讨论。任何受支持的智能指针都可以在数据成员中使用，只要它可以从规范对象指针显式构造(第3.3节，“对象和视图指针”)。例如，如果对象指针是
+shared_ptr，我们可以使用weak_ptr。</p><p class="p">When an object containing a pointer
+to another object is loaded, the pointed-to object is loaded as well.
+In some situations this eager loading of the relationships is undesirable
+since it can lead to a large number of otherwise unused objects being
+instantiated from the database. To support finer control over relationships
+loading, the ODB runtime and profile libraries provide the so-called
+lazy versions of the supported pointers. An object pointed-to by a
+lazy pointer is not loaded automatically when the containing object
+is loaded. Instead, we have to explicitly request the instantiation
+of the pointed-to object. Lazy pointers are discussed in detail in
+Section 6.4, "Lazy Pointers".</p><p class="p">加载包含指向另一个对象的指针的对象时，也会加载指向的对象。在某些情况下，这种急切地加载关系是不可取的，因为它可能导致从数据库实例化大量未使用的对象。为了更好地控制关系加载，ODB运行时和概要文件库提供了所谓的受支持指针的延迟版本。加载包含对象时，惰性指针指向的对象不会自动加载。相反，我们必须显式地请求指向对象的实例化。第6.4节“惰性指针”详细讨论了惰性指针。 </p><p class="p">As a simple example, consider the following employee-employer
+relationship. Code examples presented in this chapter will use the
+shared_ptr and weak_ptr smart pointers from the TR1 (std::tr1) namespace. </p><p class="p">作为一个简单的例子，考虑下面的雇员-雇主关系。本章中的代码示例将使用来自TR1(std:：TR1)命名空间的shared_ptr和weak_ptr智能指针。</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class employer</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string name_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long
+id_;</p><p class="p">&nbsp; std::string first_name_;</p><p class="p">&nbsp; std::string
+last_name_;</p><p class="p">&nbsp; shared_ptr&lt;employer&gt; employer_;</p><p class="p">};</p><p class="p"></p><p class="p">By default, an object pointer can be NULL. To specify
+that a pointer always points to a valid object we can use the not_null
+pragma (Section 14.4.6, "null/not_null") for single object pointers
+and the value_not_null pragma (Section 14.4.28, "value_null/value_not_null")
+for containers of object pointers. For example: </p><p class="p">默认情况下，对象指针可以为空。要指定指针始终指向有效对象，我们可以对单个对象指针使用not_null
+pragma(第14.4.6节“null/not_null”)，对对象指针容器使用value_not_nulll pragma(第14.4.28节“value_null/value_not_null”)。例如：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;employer&gt;
+current_employer_;</p><p class="p">&nbsp; #pragma db value_not_null</p><p class="p">&nbsp;
+std::vector&lt;shared_ptr&lt;employer&gt; &gt; previous_employers_;</p><p class="p">};</p><p class="p"></p><p class="p">In this case, if we call either persist() or update()
+database function on the employee object and the current_employer_
+pointer or one of the pointers stored in the previous_employers_ container
+is NULL, then the odb::null_pointer exception will be thrown.&nbsp; </p><p class="p">在这种情况下，如果我们在employee对象上调用persist()或update()数据库函数，并且当前雇主指针或存储在前一个雇主容器中的某个指针为NULL，那么将抛出odb:：NULL\u指针异常。 </p><p class="p">We don't need to do anything special to establish or navigate
+a relationship between two persistent objects, as shown in the following
+code fragment: </p><p class="p">我们不需要做任何特殊的事情来建立或导航两个持久对象之间的关系，如以下代码片段所示：</p><p class="p"></p><p class="p">// Create an employer and a few employees.</p><p class="p">//</p><p class="p">unsigned long john_id, jane_id;</p><p class="p">{</p><p class="p">&nbsp; shared_ptr&lt;employer&gt;
+er (new employer ("Example Inc"));</p><p class="p">&nbsp; shared_ptr&lt;employee&gt;
+john (new employee ("John", "Doe"));</p><p class="p">&nbsp; shared_ptr&lt;employee&gt;
+jane (new employee ("Jane", "Doe"));</p><p class="p">&nbsp; john-&gt;employer_
+= er;</p><p class="p">&nbsp; jane-&gt;employer_ = er;</p><p class="p">&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp; db.persist (er);</p><p class="p">&nbsp; john_id
+= db.persist (john);</p><p class="p">&nbsp; jane_id = db.persist (jane);</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">// Load a few employee objects
+and print their employer.</p><p class="p">//</p><p class="p">{</p><p class="p">&nbsp; session s;</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; shared_ptr&lt;employee&gt;
+john (db.load&lt;employee&gt; (john_id));</p><p class="p">&nbsp; shared_ptr&lt;employee&gt;
+jane (db.load&lt;employee&gt; (jane_id));</p><p class="p">&nbsp; cout &lt;&lt;
+john-&gt;employer_-&gt;name_ &lt;&lt; endl;</p><p class="p">&nbsp; cout &lt;&lt; jane-&gt;employer_-&gt;name_
+&lt;&lt; endl;</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p"></p><p class="p">The
+only notable line in the above code is the creation of a session before
+the second transaction starts. As discussed in Chapter 11, "Session",
+a session acts as a cache of persistent objects. By creating a session
+before loading the employee objects we make sure that their employer_
+pointers point to the same employer object. Without a session, each
+employee would have ended up pointing to its own, private instance
+of the Example Inc employer. </p><p class="p">上面代码中唯一值得注意的一行是在第二个事务开始之前创建会话。如第11章“会话”所述，会话充当持久对象的缓存。通过在加载employee对象之前创建会话，我们确保他们的雇主指针指向同一雇主对象。如果没有会话，每个员工最终都会指向自己的私人雇主实例。 </p><p class="p">As a general guideline, you should use a session when loading
+objects that have pointers to other persistent objects. A session
+makes sure that for a given object id, a single instance is shared
+among all other objects that relate to it. </p><p class="p">一般来说，在加载具有指向其他持久对象的指针的对象时，应该使用会话。会话确保对于给定的对象id，在与其相关的所有其他对象之间共享一个实例。 </p><p class="p">We can also use data members from pointed-to objects in database
+queries (Chapter 4, "Querying the Database"). For each pointer in
+a persistent class, the query class defines a smart pointer-like member
+that contains members corresponding to the data members in the pointed-to
+object. We can then use the access via a pointer syntax (-&gt;) to refer
+to data members in pointed-to objects. For example, the query class
+for the employee object contains the employer member (its name is
+derived from the employer_ pointer) which in turn contains the name
+member (its name is derived from the employer::name_ data member of
+the pointed-to object). As a result, we can use the query::employer-&gt;name
+expression while querying the database for the employee objects. For
+example, the following transaction finds all the employees of Example
+Inc that have the Doe last name: </p><p class="p">我们还可以在数据库查询中使用指向对象的数据成员(第4章，“查询数据库”)。对于持久类中的每个指针，查询类定义一个类似于智能指针的成员，该成员包含与指向对象中的数据成员相对应的成员。然后，我们可以通过指针语法(-&gt;)使用访问来引用指向对象中的数据成员。例如，employee对象的查询类包含employer成员(其名称源自employer_指针)，而employer成员又包含name成员(其名称源自指向对象的employer:：name_数据成员)。因此，在查询数据库中的employee对象时，我们可以使用query:：employer-&gt;name表达式。例如，以下事务将查找example
+Inc所有拥有Doe姓氏的员工：</p><p class="p"></p><p class="p">typedef odb::query&lt;employee&gt; query;</p><p class="p">typedef odb::result&lt;employee&gt; result;</p><p class="p">session s;</p><p class="p">transaction t (db.begin ());</p><p class="p">result r (db.query&lt;employee&gt;
+(</p><p class="p">&nbsp; query::employer-&gt;name == "Example Inc" &amp;&amp; query::last
+== "Doe"));</p><p class="p">for (result::iterator i (r.begin ()); i != r.end
+(); ++i)</p><p class="p">&nbsp; cout &lt;&lt; i-&gt;first_ &lt;&lt; " " &lt;&lt;
+i-&gt;last_ &lt;&lt; endl;</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">A query class
+member corresponding to a non-inverse (Section 6.2, "Bidirectional
+Relationships") object pointer can also be used as a normal member
+that has the id type of the pointed-to object. For example, the following
+query locates all the employee objects that don't have an associated
+employer object: </p><p class="p">与非反向(第6.2节“双向关系”)对象指针相对应的查询类成员也可以用作具有指向对象id类型的普通成员。例如，以下查询查找所有没有关联雇主对象的employee对象： </p><p class="p">result r (db.query&lt;employee&gt; (query::employer.is_null ()));</p><p class="p">An important concept to keep in mind when working with object
+relationships is the independence of persistent objects. In particular,
+when an object containing a pointer to another object is made persistent
+or is updated, the pointed-to object is not automatically persisted
+or updated. Rather, only a reference to the object (in the form of
+the object id) is stored for the pointed-to object in the database.
+The pointed-to object itself is a separate entity and should be made
+persistent or updated independently. By default, the same principle
+also applies to erasing pointed-to objects. That is, we have to make
+sure all the pointing objects are updated accordingly. However, in
+the case of erase, we can specify an alternative on-delete semantic
+as discussed in Section 14.4.15, "on_delete". </p><p class="p">处理对象关系时要记住的一个重要概念是持久对象的独立性。特别是，当包含指向另一个对象的指针的对象被持久化或更新时，指向的对象不会自动持久化或更新。相反，对于数据库中的指向对象，只存储对对象的引用(以对象id的形式)。指向对象本身是一个单独的实体，应该使其持久化或独立更新。默认情况下，相同的原则也适用于指向对象的擦除。也就是说，我们必须确保所有的定点对象都相应地更新。但是，在擦除的情况下，我们可以指定一个关于删除语义的替代方案，如Section
+14.4.15, "on_delete"。 </p><p class="p">When persisting or updating an object
+containing a pointer to another object, the pointed-to object must
+have a valid object id. This, however, may not always be easy to achieve
+in complex relationships that involve objects with automatically assigned
+identifiers. In such cases it may be necessary to first persist an
+object with a pointer set to NULL and then, once the pointed-to object
+is made persistent and its identifier assigned, set the pointer to
+the correct value and update the object in the database. </p><p class="p">当持久化或更新包含指向另一个对象的指针的对象时，指向的对象必须具有有效的对象id。但是，在涉及自动分配标识符的对象的复杂关系中，这可能并不总是容易实现。在这种情况下，可能需要首先将指针设置为NULL的对象持久化，然后，一旦指向的对象持久化并分配了其标识符，将指针设置为正确的值并更新数据库中的对象。 </p><p class="p">Persistent object relationships can be divided into two groups:
+unidirectional and bidirectional. Each group in turn contains several
+configurations that vary depending on the cardinality of the sides
+of the relationship. All possible unidirectional and bidirectional
+configurations are discussed in the following sections. </p><p class="p">持久对象关系可以分为两组：单向和双向。每个组依次包含多个配置，这些配置根据关系双方的基数而有所不同。以下各节将讨论所有可能的单向和双向配置。</p><p class="p">&nbsp;</p><p class="p">6.1 Unidirectional Relationships&nbsp; 单向关系</p><p class="p">In unidirectional relationships we are only interested in navigating
+from object to object in one direction. Because there is no interest
+in navigating in the opposite direction, the cardinality of the other
+end of the relationship is unimportant. As a result, there are only
+two possible unidirectional relationships: to-one and to-many. Each
+of these relationships is described in the following sections. For
+sample code that shows how to work with these relationships, refer
+to the relationship example in the odb-examples package. </p><p class="p">在单向关系中，我们只对在一个方向上从一个对象导航到另一个对象感兴趣。因为没有兴趣朝相反的方向航行，所以关系的另一端的基数并不重要。因此，只有两种可能的单向关系：对一和对多。以下各节介绍了这些关系。有关显示如何处理这些关系的示例代码，请参阅odb-examples包中的关系示例。</p><p class="p">6.1.1 To-One Relationships&nbsp; 一对一关系</p><p class="p">An example of a unidirectional
+to-one relationship is the employee-employer relationship (an employee
+has one employer). The following persistent C++ classes model this
+relationship: </p><p class="p">单向对一关系的一个例子是雇员-雇主关系(雇员有一个雇主)。下面的持久C++类对这种关系进行建模：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class employer</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string name_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long
+id_;</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;employer&gt;
+employer_;</p><p class="p">};</p><p class="p"></p><p class="p">The corresponding database tables
+look like this:</p><p class="p">对应的数据库表像下面这样：</p><p class="p"></p><p class="p">CREATE TABLE employer
+(</p><p class="p">&nbsp; name VARCHAR (255) NOT NULL PRIMARY KEY);</p><p class="p">CREATE
+TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY
+KEY,</p><p class="p">&nbsp; employer VARCHAR (255) NOT NULL REFERENCES employer
+(name));</p><p class="p"></p><p class="p">6.1.2 To-Many Relationships&nbsp; 一对多关系</p><p class="p">An example of a unidirectional to-many relationship is the employee-project
+relationship (an employee can be involved in multiple projects). The
+following persistent C++ classes model this relationship: </p><p class="p">单向对多关系的一个示例是员工项目关系(一名员工可以参与多个项目)。下面的持久C++类对这种关系进行建模</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class project</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string name_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long
+id_;</p><p class="p">&nbsp; #pragma db value_not_null unordered</p><p class="p">&nbsp;
+std::vector&lt;shared_ptr&lt;project&gt; &gt; projects_;</p><p class="p">};</p><p class="p"></p><p class="p">The corresponding database tables look like this:</p><p class="p">对应的数据库表像下面这样：</p><p class="p"></p><p class="p">CREATE TABLE project (</p><p class="p">&nbsp; name VARCHAR (255)
+NOT NULL PRIMARY KEY);</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp;
+id BIGINT UNSIGNED NOT NULL PRIMARY KEY);</p><p class="p">CREATE TABLE employee_projects
+(</p><p class="p">&nbsp; object_id BIGINT UNSIGNED NOT NULL,</p><p class="p">&nbsp; value
+VARCHAR (255) NOT NULL REFERENCES project (name));</p><p class="p"></p><p class="p">To
+obtain a more canonical database schema, the names of tables and columns
+above can be customized using ODB pragmas (Chapter 14, "ODB Pragma
+Language"). For example: </p><p class="p">为了获得更规范的数据库模型，可以使用ODB Pragma(第14章，“ODB
+Pragma语言”)定制上述表和列的名称。例如：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class
+employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db value_not_null
+unordered \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+id_column("employee_id") value_column("project_name")</p><p class="p">&nbsp;
+std::vector&lt;shared_ptr&lt;project&gt; &gt; projects_;</p><p class="p">};</p><p class="p"></p><p class="p">The resulting employee_projects table would then look like
+this:</p><p class="p">对应的数据库表像下面这样：</p><p class="p">CREATE TABLE employee_projects (</p><p class="p">&nbsp; employee_id BIGINT UNSIGNED NOT NULL,</p><p class="p">&nbsp; project_name
+VARCHAR (255) NOT NULL REFERENCES project (name));</p><p class="p">6.2 Bidirectional
+Relationships 双向关系</p><p class="p">In bidirectional relationships we are interested
+in navigating from object to object in both directions. As a result,
+each object class in a relationship contains a pointer to the other
+object. If smart pointers are used, then a weak pointer should be
+used as one of the pointers to avoid ownership cycles. For example: </p><p class="p">在双向关系中，我们感兴趣的是在两个方向上从一个对象导航到另一个对象。因此，关系中的每个对象类都包含指向另一个对象的指针。如果使用智能指针，则应使用弱指针作为指针之一，以避免所有权循环。例如：</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class position</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned
+long id_;</p><p class="p">&nbsp; weak_ptr&lt;employee&gt; employee_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp;
+#pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;position&gt; position_;</p><p class="p">};</p><p class="p"></p><p class="p">Note that when we establish a bidirectional relationship,
+we have to set both pointers consistently. One way to make sure that
+a relationship is always in a consistent state is to provide a single
+function that updates both pointers at the same time. For example: </p><p class="p">注意，当我们建立双向关系时，我们必须一致地设置两个指针。确保关系始终处于一致状态的一种方法是提供一个同时更新两个指针的函数。例如：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class position: public enable_shared_from_this&lt;position&gt;</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; void</p><p class="p">&nbsp; fill (shared_ptr&lt;employee&gt;
+e)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; employee_ = e;</p><p class="p">&nbsp;&nbsp;&nbsp;
+e-&gt;positions_ = shared_from_this ();</p><p class="p">&nbsp; }</p><p class="p">private:</p><p class="p">&nbsp; weak_ptr&lt;employee&gt; employee_;</p><p class="p">};</p><p class="p">#pragma
+db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; friend class position;</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;position&gt; position_;</p><p class="p">};</p><p class="p"></p><p class="p">At the beginning of this chapter we examined how to use a session
+to make sure a single object is shared among all other objects pointing
+to it. With bidirectional relationships involving weak pointers the
+use of a session becomes even more crucial. Consider the following
+transaction that tries to load the position object from the above
+example without using a session:</p><p class="p">在本章的开头，我们研究了如何使用会话来确保单个对象在指向它的所有其他对象之间共享。对于涉及弱指针的双向关系，会话的使用变得更加重要。考虑下面的事务，它试图在不使用会话的情况下从上面的示例加载位置对象：</p><p class="p">transaction t (db.begin ())</p><p class="p">shared_ptr&lt;position&gt; p (db.load&lt;position&gt;
+(1));</p><p class="p">...</p><p class="p">t.commit ();</p><p class="p">When we load the position
+object, the employee object, which it points to, is also loaded. While
+employee is initially stored as shared_ptr, it is then assigned to
+the employee_ member which is weak_ptr. Once the assignment is complete,
+the shared pointer goes out of scope and the only pointer that points
+to the newly loaded employee object is the employee_ weak pointer.
+And that means the employee object is deleted immediately after being
+loaded. To help avoid such pathological situations ODB detects cases
+where a newly loaded object will immediately be deleted and throws
+the odb::session_required exception.</p><p class="p">加载position对象时，也会加载它所指向的employee对象。当
+employee 最初存储为 shared_ptr 时，它将被分配给 weak_ptr employee_&nbsp; 成员。分配完成后，共享指针将超出范围，并且指向新加载的employee对象的唯一指针是弱指针employee_
+。这意味着employee对象在加载后立即被删除。为了帮助避免这种病态情况，ODB检测到新加载的对象将立即被删除的情况，并抛出ODB:：session_required异常。</p><p class="p">As the exception name suggests, the easiest way to resolve this
+problem is to use a session:</p><p class="p">正如异常名称所示，解决此问题的最简单方法是使用会话：</p><p class="p">session s;</p><p class="p">transaction t (db.begin ())</p><p class="p">shared_ptr&lt;position&gt;
+p (db.load&lt;position&gt; (1));</p><p class="p">...</p><p class="p">t.commit ();</p><p class="p">In
+our example, the session will maintain a shared pointer to the loaded
+employee object preventing its immediate deletion. Another way to
+resolve this problem is to avoid immediate loading of the pointed-to
+objects using lazy weak pointers. Lazy pointers are discussed in Section
+6.4, "Lazy Pointers" later in this chapter.</p><p class="p">在我们的示例中，会话将维护一个指向加载的employee对象的共享指针，以防止立即删除该对象。解决此问题的另一种方法是避免使用惰性弱指针立即加载指向的对象。惰性指针将在本章后面的第6.4节“惰性指针”中讨论。</p><p class="p">Above, to model a bidirectional relationship in persistent classes,
+we used two pointers, one in each object. While this is a natural
+representation in C++, it does not translate to a canonical relational
+model. Consider the database schema generated for the above two classes:</p><p class="p">上面，为了在持久类中建模双向关系，我们使用了两个指针，每个对象中一个指针。虽然这是C++中的自然表示，但它并不转化为规范关系模型。考虑为上面两个类生成的数据库模型：</p><p class="p"></p><p class="p">CREATE TABLE position (</p><p class="p">&nbsp; id BIGINT UNSIGNED
+NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; employee BIGINT UNSIGNED REFERENCES
+employee (id));</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp; id BIGINT
+UNSIGNED NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; position BIGINT UNSIGNED
+NOT NULL REFERENCES position (id));</p><p class="p"></p><p class="p">While this database
+schema is valid, it is unconventional. We have a reference from a
+row in the position table to a row in the employee table. We also
+have a reference from this same row in the employee table back to
+the row in the position table. From the relational point of view,
+one of these references is redundant since in SQL we can easily navigate
+in both directions using just one of these references.</p><p class="p">虽然这个数据库模型是有效的，但它是非传统的。我们有一个从position表中的一行到employee表中的一行的引用。我们还有一个从employee表中的同一行返回到position表中的行的引用。从关系的角度来看，其中一个引用是多余的，因为在SQL中，我们可以使用其中一个引用轻松地在两个方向上导航。</p><p class="p">To eliminate redundant database schema references we can use the
+inverse pragma (Section 14.4.14, "inverse") which tells the ODB compiler
+that a pointer is the inverse side of a bidirectional relationship.
+Either side of a relationship can be made inverse. For example:</p><p class="p">为了消除冗余的数据库模型引用，我们可以使用inverse pragma(第14.4.14节，“反向”)，它告诉ODB编译器指针是双向关系的反向端。关系的任何一边都可以反转。例如：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class position</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db inverse(position_)</p><p class="p">&nbsp; weak_ptr&lt;employee&gt;
+employee_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp;
+shared_ptr&lt;position&gt; position_;</p><p class="p">};</p><p class="p"></p><p class="p">The resulting
+database schema looks like this:</p><p class="p"></p><p class="p">CREATE TABLE position
+(</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY KEY);</p><p class="p">CREATE
+TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY
+KEY,</p><p class="p">&nbsp; position BIGINT UNSIGNED NOT NULL REFERENCES position
+(id));</p><p class="p"></p><p class="p">As you can see, an inverse member does not have
+a corresponding column (or table, in case of an inverse container
+of pointers) and, from the point of view of database operations, is
+effectively read-only. The only way to change a bidirectional relationship
+with an inverse side is to set its direct (non-inverse) pointer. Also
+note that an ordered container (Section 5.1, "Ordered Containers")
+of pointers that is an inverse side of a bidirectional relationship
+is always treated as unordered (Section 14.4.19, "unordered") because
+the contents of such a container are implicitly built from the direct
+side of the relationship which does not contain the element order
+(index).</p><p class="p">如您所见，反向成员没有相应的列(如果是指针的反向容器，则为表)，并且从数据库操作的角度来看，它实际上是只读的。更改与反向侧的双向关系的唯一方法是设置其直接(非反向)指针。还请注意，作为双向关系的反向侧的指针的有序容器(第5.1节，“有序容器”)始终被视为无序容器(第14.4.19节，“无序”)，因为此类容器的内容是从不包含元素顺序的关系的直接侧隐式构建的(索引)。</p><p class="p">There are three distinct bidirectional relationships that we will
+cover in the following sections: one-to-one, one-to-many, and many-to-many.
+We will only talk about bidirectional relationships with inverse sides
+since they result in canonical database schemas. For sample code that
+shows how to work with these relationships, refer to the inverse example
+in the odb-examples package.</p><p class="p">我们将在以下部分介绍三种不同的双向关系：一对一、一对多和多对多。我们将只讨论反向的双向关系，因为它们会导致规范化的数据库模型。有关显示如何处理这些关系的示例代码，请参阅odb示例包中的反向示例。</p><p class="p">6.2.1 One-to-One Relationships 一对一关系</p><p class="p">An example of a bidirectional
+one-to-one relationship is the presented above employee-position relationship
+(an employee fills one position and a position is filled by one employee).
+The following persistent C++ classes model this relationship:</p><p class="p">双向一对一关系的一个示例是上述员工职位关系(一名员工填补一个职位，一名职位由一名员工填补)。下面的持久C++类对这种关系进行建模：</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class position</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned
+long id_;</p><p class="p">&nbsp; #pragma db inverse(position_)</p><p class="p">&nbsp;
+weak_ptr&lt;employee&gt; employee_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db
+id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;position&gt; position_;</p><p class="p">};</p><p class="p"></p><p class="p">The corresponding database tables look like this:</p><p class="p"></p><p class="p">CREATE
+TABLE position (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY
+KEY);</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED
+NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; position BIGINT UNSIGNED NOT NULL
+REFERENCES position (id));</p><p class="p"></p><p class="p">If instead the other side
+of this relationship is made inverse, then the database tables will
+change as follows:</p><p class="p">如果这个关系的另一端是反向的，那么数据库表将会发生如下变化:</p><p class="p"></p><p class="p">CREATE TABLE position (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL
+PRIMARY KEY,</p><p class="p">&nbsp; employee BIGINT UNSIGNED REFERENCES employee
+(id));</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED
+NOT NULL PRIMARY KEY);</p><p class="p"></p><p class="p">6.2.2 One-to-Many Relationships
+一对多关系</p><p class="p">An example of a bidirectional one-to-many relationship
+is the employer-employee relationship (an employer has multiple employees
+and an employee is employed by one employer). The following persistent
+C++ classes model this relationship:</p><p class="p">双向一对多关系的一个例子是雇主-雇员关系(一个雇主有多个雇员，一个雇员受雇于一个雇主)。下面的持久C++类对这种关系进行建模：</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class employer</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string
+name_;</p><p class="p">&nbsp; #pragma db value_not_null inverse(employer_)</p><p class="p">&nbsp; std::vector&lt;weak_ptr&lt;employee&gt; &gt; employees_</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;employer&gt;
+employer_;</p><p class="p">};</p><p class="p"></p><p class="p">The corresponding database tables
+differ significantly depending on which side of the relationship is
+made inverse. If the one side (employer) is inverse as in the code
+above, then the resulting database schema looks like this:</p><p class="p">根据关系的哪一侧被反转，相应的数据库表会有很大的不同。如果一方(雇主)与上述代码相反，则生成的数据库模型如下所示：</p><p class="p"></p><p class="p">CREATE TABLE employer (</p><p class="p">&nbsp; name VARCHAR (255)
+NOT NULL PRIMARY KEY);</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp;
+id BIGINT UNSIGNED NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; employer VARCHAR
+(255) NOT NULL REFERENCES employer (name));</p><p class="p"></p><p class="p">If instead
+the many side (employee) of this relationship is made inverse, then
+the database tables will change as follows:</p><p class="p">如果将此关系的多端(employee)反置，则数据库表将发生如下变化:</p><p class="p"></p><p class="p">CREATE TABLE employer (</p><p class="p">&nbsp; name VARCHAR (255)
+NOT NULL PRIMARY KEY);</p><p class="p">CREATE TABLE employer_employees (</p><p class="p">&nbsp; object_id VARCHAR (255) NOT NULL,</p><p class="p">&nbsp; value BIGINT
+UNSIGNED NOT NULL REFERENCES employee (id));</p><p class="p">CREATE TABLE employee
+(</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY KEY);</p><p class="p"></p><p class="p">6.2.3 Many-to-Many Relationships&nbsp; 多对多关系</p><p class="p">An example
+of a bidirectional many-to-many relationship is the employee-project
+relationship (an employee can work on multiple projects and a project
+can have multiple participating employees). The following persistent
+C++ classes model this relationship:</p><p class="p">双向多对多关系的一个示例是员工项目关系(一名员工可以从事多个项目，一个项目可以有多个参与员工)。下面的持久C++类对这种关系进行建模：</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class project</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string
+name_;</p><p class="p">&nbsp; #pragma db value_not_null inverse(projects_)</p><p class="p">&nbsp; std::vector&lt;weak_ptr&lt;employee&gt; &gt; employees_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma db value_not_null unordered</p><p class="p">&nbsp; std::vector&lt;shared_ptr&lt;project&gt;
+&gt; projects_;</p><p class="p">};</p><p class="p"></p><p class="p">The corresponding database tables
+look like this:</p><p class="p"></p><p class="p">CREATE TABLE project (</p><p class="p">&nbsp; name
+VARCHAR (255) NOT NULL PRIMARY KEY);</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY KEY);</p><p class="p">CREATE
+TABLE employee_projects (</p><p class="p">&nbsp; object_id BIGINT UNSIGNED NOT
+NULL,</p><p class="p">&nbsp; value VARCHAR (255) NOT NULL REFERENCES project
+(name));</p><p class="p"></p><p class="p">If instead the other side of this relationship
+is made inverse, then the database tables will change as follows:</p><p class="p">相反，如果将此关系的另一端设置为反向，则数据库表将更改如下：</p><p class="p"></p><p class="p">CREATE TABLE project
+(</p><p class="p">&nbsp; name VARCHAR (255) NOT NULL PRIMARY KEY);</p><p class="p">CREATE
+TABLE project_employees (</p><p class="p">&nbsp; object_id VARCHAR (255) NOT
+NULL,</p><p class="p">&nbsp; value BIGINT UNSIGNED NOT NULL REFERENCES employee
+(id));</p><p class="p">CREATE TABLE employee (</p><p class="p">&nbsp; id BIGINT UNSIGNED
+NOT NULL PRIMARY KEY);</p><p class="p"></p><p class="p">6.3 Circular Relationships&nbsp;
+循环关系</p><p class="p">A relationship between two persistent classes is circular
+if each of them references the other. Bidirectional relationships
+are always circular. A unidirectional relationship combined with inheritance
+(Chapter 8, "Inheritance") can also be circular. For example, the
+employee class could derive from person which, in turn, could contain
+a pointer to employee.</p><p class="p">如果两个持久类中的每一个都引用另一个，则它们之间的关系是循环的。双向关系总是循环的。与继承相结合的单向关系(第8章“继承”)也可以是循环的。例如，employee类可以派生自person，person又可以包含指向employee的指针。</p><p class="p">We don't need to do anything extra if persistent classes with
+circular dependencies are defined in the same header file. Specifically,
+ODB will make sure that the database tables and foreign key constraints
+are created in the correct order. As a result, unless you have good
+reasons not to, it is recommended that you keep persistent classes
+with circular dependencies in the same header file.</p><p class="p">如果在同一头文件中定义了具有循环依赖关系的持久类，则不需要做任何额外的工作。具体来说，ODB将确保以正确的顺序创建数据库表和外键约束。因此，除非您有充分的理由不这样做，否则建议您在同一头文件中保留具有循环依赖关系的持久类。</p><p class="p">If you have to keep such classes in separate header files, then
+there are two extra steps that you may need to take in order to use
+these classes with ODB. Consider again the example from Section 6.2.1,
+"One-to-One Relationships" but this time with the classes defined
+in separate headers:</p><p class="p">如果您必须将这些类保存在单独的头文件中，那么为了在ODB中使用这些类，您可能需要采取两个额外的步骤。再次考虑第Section
+6.2.1, "One-to-One Relationships"，但这一次使用在单独的标题中定义的类：</p><p class="p"></p><p class="p">/ position.hxx</p><p class="p">//</p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class position</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db
+id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma db inverse(position_)</p><p class="p">&nbsp; weak_ptr&lt;employee&gt; employee_;</p><p class="p">};</p><p class="p">&nbsp; </p><p class="p">// employee.hxx</p><p class="p">//</p><p class="p">#include "position.hxx"</p><p class="p">#pragma
+db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp;
+#pragma db id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma
+db not_null</p><p class="p">&nbsp; shared_ptr&lt;position&gt; position_;</p><p class="p">};</p><p class="p"></p><p class="p">Note that the position.hxx header contains only the
+forward declaration for employee. While this is sufficient to define
+a valid, from the C++ point of view, position class, the ODB compiler
+needs to "see" the definitions of the pointed-to persistent classes.
+There are several ways we can fulfil this requirement. The easiest
+is to simply include employee.hxx at the end of position.hxx: </p><p class="p">注意这个 position.hxx 标题仅包含员工的转发声明。虽然这足以定义一个有效的，从C++的观点来看，position
+class，ODB编译器需要“看到”指向指向持久类的定义。我们有几种方法可以满足这一要求。最简单的方法是简单地包括 employee.hxx
+位于 position.hxx 的末尾。</p><p class="p"></p><p class="p">// position.hxx</p><p class="p">//</p><p class="p">class
+employee;</p><p class="p">#pragma db object</p><p class="p">class position</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">#include "employee.hxx"</p><p class="p"></p><p class="p">We can also limit this inclusion only to the time when position.hxx
+is compiled with the ODB compiler:</p><p class="p">我们也可以将此列入仅限时间当 position.hxx
+是用ODB编译器编译的:</p><p class="p"></p><p class="p">// position.hxx</p><p class="p">//</p><p class="p">...</p><p class="p">#ifdef ODB_COMPILER</p><p class="p">#&nbsp; include "employee.hxx"</p><p class="p">#endif</p><p class="p"></p><p class="p">Finally, if we don't want to modify position.hxx, then
+we can add employee.hxx to the ODB compilation process with the --odb-epilogue
+option. For example:</p><p class="p">最后，如果我们不想改变 position.hxx，我们就可以添加 employee.hxx
+到ODB编译过程中使用——ODB -epilogue选项。例如:</p><p class="p">odb ... --odb-epilogue "#include
+\"employee.hxx\"" position.hxx</p><p class="p">Note also that in this example
+we didn't have to do anything extra for employee.hxx because it already
+includes position.hxx. However, if instead it relied only on the forward
+declaration of the position class, then we would have to handle it
+in the same way as position.hxx. </p><p class="p">还要注意，在这个例子中，我们不必为 employee.hxx
+做任何额外的事情。因为它已经包含 position.hxx 。然而，如果它只依赖于position类的forward声明，那么我们必须以与
+position.hxx 相同的方式处理它。</p><p class="p">The other difficulty with separately
+defined classes involving circular relationships has to do with the
+correct order of foreign key constraint creation in the generated
+database schema. In the above example, if we generate the database
+schema as standalone SQL files, then we will end up with two such
+files: position.sql and employee.sql. If we try to execute employee.sql
+first, then we will get an error indicating that the table corresponding
+to the position class and referenced by the foreign key constraint
+corresponding to the position_ pointer does not yet exist. </p><p class="p">涉及循环关系的单独定义类的另一个困难与生成的数据库模型中外键约束创建的正确顺序有关。在上面的示例中，如果我们将数据库模型生成为独立的SQL文件，那么我们将得到两个这样的文件：position.sql
+和 employee.sql 。如果我们试图先执行 employee.sql ，然后我们将得到一个错误，表明与position类相对应的表以及由与position_
+pointer 相对应的外键约束引用的表还不存在。</p><p class="p">Note that there is no such problem
+if the database schema is embedded in the generated C++ code instead
+of being produced as standalone SQL files. In this case, the ODB compiler
+is able to ensure the correct creation order even if the classes are
+defined in separate header files. </p><p class="p">注意，如果数据库模型嵌入生成的C++代码中而不是作为独立的SQL文件生成，则不会存在这样的问题。在这种情况下，即使类在单独的头文件中定义，ODB编译器也能够确保正确的创建顺序。</p><p class="p">In certain cases, for example, a bidirectional relationship with
+an inverse side, this problem can be resolved by executing the database
+schema creation files in the correct order. In our example, this would
+be position.sql first and employee.sql second. However, this approach
+doesn't scale beyond simple object models. </p><p class="p">在某些情况下，例如，反向的双向关系，这个问题可以通过以正确的顺序执行数据库模型创建文件来解决。在我们的例子中，我们需要先执行
+position.sql然后再执行employee.sql。然而，这种方法不能扩展到简单的对象模型之外。</p><p class="p">A more
+robust solution to this problem is to generate the database schema
+for all the persistent classes into a single SQL file. This way, the
+ODB compiler can again ensure the correct creation order of tables
+and foreign keys. To instruct the ODB compiler to produce a combined
+schema file for several headers we can use the --generate-schema-only
+and --at-once options. For example:</p><p class="p">这个问题的一个更健壮的解决方案是将所有持久类的数据库模型生成到一个SQL文件中。这样，ODB编译器可以再次确保表和外键的正确创建顺序。为了指示ODB编译器为多个头生成一个组合模型文件，我们可以使用--generate
+schema only和--at once选项。例如：</p><p class="p">odb ... --generate-schema-only --at-once
+--input-name company \</p><p class="p">position.hxx employee.hxx</p><p class="p">The result
+of the above command is a single company.sql file (the name is derived
+from the --input-name value) that contains the database creation code
+for both position and employee classes.</p><p class="p">上述命令的结果是只有一个company.sqll文件(名称派生自--input
+name值)，其中包含position和employee类的数据库创建代码。</p><p class="p">6.4 Lazy Pointers 惰性指针</p><p class="p">Consider again the bidirectional, one-to-many employer-employee
+relationship that was presented earlier in this chapter:</p><p class="p">再次考虑本章前面提出的双向的一对多雇主-雇员关系：</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class employer</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; std::string
+name_;</p><p class="p">&nbsp; #pragma db value_not_null inverse(employer_)</p><p class="p">&nbsp; std::vector&lt;weak_ptr&lt;employee&gt; &gt; employees_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; shared_ptr&lt;employer&gt;
+employer_;</p><p class="p">};</p><p class="p">&nbsp; </p><p class="p"></p><p class="p">Consider also the following
+transaction which obtains the employer name given the employee id:</p><p class="p">考虑下面的事务，它获得给定员工id的雇主名称:</p><p class="p"></p><p class="p">unsigned long id = ...</p><p class="p">string name;</p><p class="p">session s;</p><p class="p">transaction t (db.begin ());</p><p class="p">shared_ptr&lt;employee&gt; e (db.load&lt;employee&gt; (id));</p><p class="p">name
+= e-&gt;employer_-&gt;name_;</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">While this
+transaction looks very simple, it actually does a lot more than what
+meets the eye and is necessary. Consider what happens when we load
+the employee object: the employer_ pointer is also automatically loaded
+which means the employer object corresponding to this employee is
+also loaded. But the employer object in turn contains the list of
+pointers to all the employees, which are also loaded. A a result,
+when object relationships are involved, a simple transaction like
+the above can load many more objects than is necessary.</p><p class="p">&nbsp;虽然这项交易看起来非常简单，但实际上它所做的远远超过了人们所看到的和必要的。考虑当我们加载雇员对象时会发生什么：雇主指针也被自动加载，这意味着与这个雇员对应的雇主对象也被加载。但是雇主对象反过来包含指向所有雇员的指针列表，这些指针也被加载。结果，当涉及对象关系时，像上面这样的简单事务可以加载比需要多得多的对象。</p><p class="p">To overcome this problem ODB offers finer grained control over
+the relationship loading in the form of lazy pointers. A lazy pointer
+does not automatically load the pointed-to object when the containing
+object is loaded. Instead, we have to explicitly load the pointed-to
+object if and when we need to access it. </p><p class="p">为了克服这个问题，ODB以惰性指针的形式提供了对关系加载的细粒度控制。加载包含对象时，惰性指针不会自动加载指向的对象。相反，如果需要访问指向的对象，我们必须显式地加载它。</p><p class="p">The ODB runtime library provides lazy counterparts for all the
+supported pointers, namely: odb::lazy_shared_ptr/lazy_weak_ptr for
+C++11 std::shared_ptr/weak_ptr, odb::tr1::lazy_shared_ptr/lazy_weak_ptr
+for TR1 std::tr1::shared_ptr/weak_ptr, odb::lazy_unique_ptr for C++11
+std::unique_ptr, odb::lazy_auto_ptr for std::auto_ptr, and odb::lazy_ptr
+for raw pointers. The TR1 lazy pointers are defined in the &lt;odb/tr1/lazy-ptr.hxx&gt;
+header while all the others — in &lt;odb/lazy-ptr.hxx&gt;. The ODB profile
+libraries also provide lazy pointer implementations for smart pointers
+from popular frameworks and libraries (Part III, "Profiles"). </p><p class="p">ODB运行时库为所有受支持的指针提供了惰性对应项，即：odb::lazy_shared_ptr/lazy_weak_ptr
+for C++11 std::shared_ptr/weak_ptr, odb::tr1::lazy_shared_ptr/lazy_weak_ptr，ODB::lazy_unique_ptr
+for C++11 std::unique_ptr，ODB::lazy_auto_ptr for std:：auto_ptr for
+std::auto_ptr，和odb::lazy_ptr for 原始指针。TR1惰性指针定义在&lt;odb/tr1/lazy-ptr.hxx&gt;头文件中，而所有其他定义在在&lt;odb/lazy-ptr.hxx&gt;。ODB概要文件库还为来自流行框架和库的智能指针提供了惰性指针实现(第三部分，“概要文件”)。</p><p class="p">While we will discuss the interface of lazy pointers in more detail
+shortly, the most commonly used extra function provided by these pointers
+is load(). This function loads the pointed-to object if it hasn't
+already been loaded. After the call to this function, the lazy pointer
+can be used in the the same way as its eager counterpart. The load()
+function also returns the eager pointer, in case you need to pass
+it around. For a lazy weak pointer, the load() function also locks
+the pointer.</p><p class="p">&nbsp;虽然我们稍后将更详细地讨论惰性指针的接口，但这些指针提供的最常用的额外函数是load()。如果指向的对象尚未加载，则此函数将加载该对象。在调用此函数后，可以使用与其对应的惰性指针相同的方法使用惰性指针。如果需要传递，load()函数还返回效仿的指针。对于惰性弱指针，load()函数还锁定指针。</p><p class="p">The following example shows how we can change our employer-employee
+relationship to use lazy pointers. Here we choose to use lazy pointers
+for both sides of the relationship.</p><p class="p">下面的示例显示了如何更改雇主-雇员关系以使用惰性指针。在这里，我们选择对关系的双方使用惰性指针。</p><p class="p"></p><p class="p">class employee;</p><p class="p">#pragma db object</p><p class="p">class employer</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db value_not_null inverse(employer_)</p><p class="p">&nbsp; std::vector&lt;lazy_weak_ptr&lt;employee&gt; &gt; employees_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db not_null</p><p class="p">&nbsp; lazy_shared_ptr&lt;employer&gt;
+employer_;</p><p class="p">};</p><p class="p"></p><p class="p">And the transaction is changed like
+this:</p><p class="p"></p><p class="p">unsigned long id = ...</p><p class="p">string name;</p><p class="p">session s;</p><p class="p">transaction t (db.begin ());</p><p class="p">shared_ptr&lt;employee&gt;
+e (db.load&lt;employee&gt; (id));</p><p class="p">e-&gt;employer_.load ();</p><p class="p">name
+= e-&gt;employer_-&gt;name_;</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">As a general
+guideline we recommend that you make at least one side of a bidirectional
+relationship lazy, especially for relationships with a many side. </p><p class="p">作为一般准则，我们建议您至少让双向关系的一方变得懒惰，特别是对于有多方的关系。</p><p class="p">A lazy pointer implementation
+mimics the interface of its eager counterpart which can be used once
+the pointer is loaded. It also adds a number of additional functions
+that are specific to the lazy loading functionality. Overall, the
+interface of a lazy pointer follows this general outline:</p><p class="p">惰性指针实现模仿其效仿指针的对应接口，一旦加载指针即可使用该接口。它还添加了一些特定于延迟加载功能的附加函数。总的来说，惰性指针的接口遵循以下概述：</p><p class="p"></p><p class="p">template &lt;class T&gt;</p><p class="p">class lazy_ptr</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; //</p><p class="p">&nbsp; // The eager pointer interface.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; // Initialization/assignment from an eager
+pointer.</p><p class="p">&nbsp; //</p><p class="p">public:</p><p class="p">&nbsp; template &lt;class
+Y&gt; lazy_ptr (const eager_ptr&lt;Y&gt;&amp;);</p><p class="p">&nbsp; template &lt;class
+Y&gt; lazy_ptr&amp; operator= (const eager_ptr&lt;Y&gt;&amp;);</p><p class="p">&nbsp;
+// Lazy loading interface.</p><p class="p">&nbsp; //</p><p class="p">public:</p><p class="p">&nbsp;
+//&nbsp; NULL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; loaded()</p><p class="p">&nbsp;
+//</p><p class="p">&nbsp; //&nbsp; true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; NULL pointer to transient object</p><p class="p">&nbsp; //&nbsp; false&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+valid pointer to persistent object</p><p class="p">&nbsp; //&nbsp; true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+false&nbsp;&nbsp;&nbsp;&nbsp; unloaded pointer to persistent object</p><p class="p">&nbsp; //&nbsp; false&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; false&nbsp;&nbsp;&nbsp;&nbsp;
+valid pointer to transient object</p><p class="p">&nbsp; //</p><p class="p">&nbsp; bool
+loaded () const;</p><p class="p">&nbsp; eager_ptr&lt;T&gt; load () const;</p><p class="p">&nbsp; // Unload the pointer. For transient objects this function
+is</p><p class="p">&nbsp; // equivalent to reset().</p><p class="p">&nbsp; //</p><p class="p">&nbsp;
+void unload () const;</p><p class="p">&nbsp; // Get the underlying eager pointer.
+If this is an unloaded pointer</p><p class="p">&nbsp; // to a persistent object,
+then the returned pointer will be NULL.</p><p class="p">&nbsp; //</p><p class="p">&nbsp;
+eager_ptr&lt;T&gt; get_eager () const;</p><p class="p">&nbsp; // Initialization
+with a persistent loaded object.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; template
+&lt;class Y&gt; lazy_ptr (database&amp;, Y*);</p><p class="p">&nbsp; template &lt;class
+Y&gt; lazy_ptr (database&amp;, const eager_ptr&lt;Y&gt;&amp;);</p><p class="p">&nbsp;
+template &lt;class Y&gt; void reset (database&amp;, Y*);</p><p class="p">&nbsp;
+template &lt;class Y&gt; void reset (database&amp;, const eager_ptr&lt;Y&gt;&amp;);</p><p class="p">&nbsp; // Initialization with a persistent unloaded object.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; template &lt;class ID&gt; lazy_ptr (database&amp;,
+const ID&amp;);</p><p class="p">&nbsp; template &lt;class ID&gt; void reset (database&amp;,
+const ID&amp;);</p><p class="p">&nbsp; // Query object id and database of a
+persistent object.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; template &lt;class
+O /* = T */&gt;</p><p class="p">&nbsp; // C++11: template &lt;class O = T&gt;</p><p class="p">&nbsp; object_traits&lt;O&gt;::id_type object_id () const;</p><p class="p">&nbsp;
+odb::database&amp; database () const;</p><p class="p">};</p><p class="p"></p><p class="p">In a lazy
+weak pointer interface, the load() function returns the strong (shared)
+eager pointer. The following transaction demonstrates the use of a
+lazy weak pointer based on the employer and employee classes presented
+earlier.</p><p class="p">在惰性弱指针接口中，load()函数返回强(共享)急切指针。下面的事务演示了基于前面介绍的employer和employee类的惰性弱指针的使用。</p><p class="p"></p><p class="p">typedef std::vector&lt;lazy_weak_ptr&lt;employee&gt; &gt; employees;</p><p class="p">session s;</p><p class="p">transaction t (db.begin ());</p><p class="p">shared_ptr&lt;employer&gt;
+er (db.load&lt;employer&gt; ("Example Inc"));</p><p class="p">employees&amp; es
+(er-&gt;employees ());</p><p class="p">for (employees::iterator i (es.begin ());
+i != es.end (); ++i)</p><p class="p">{</p><p class="p">&nbsp; // We are only interested
+in employees with object id less than</p><p class="p">&nbsp; // 100.</p><p class="p">&nbsp;
+//</p><p class="p">&nbsp; lazy_weak_ptr&lt;employee&gt;&amp; lwp (*i);</p><p class="p">&nbsp;
+if (lwp.object_id&lt;employee&gt; () &lt; 100)</p><p class="p">&nbsp; // C++11:
+if (lwp.object_id () &lt; 100)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+shared_ptr&lt;employee&gt; e (lwp.load ()); // Load and lock.</p><p class="p">&nbsp;&nbsp;&nbsp;
+cout &lt;&lt; e-&gt;first_ &lt;&lt; " " &lt;&lt; e-&gt;last_ &lt;&lt; endl;</p><p class="p">&nbsp; }</p><p class="p">}</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">Notice that inside
+the for-loop we use a reference to the lazy weak pointer instead of
+making a copy. This is not merely to avoid a copy. When a lazy pointer
+is loaded, all other lazy pointers that point to the same object do
+not automatically become loaded (though an attempt to load such copies
+will result in them pointing to the same object, provided the same
+session is still in effect). By using a reference in the above transaction
+we make sure that we load the pointer that is contained in the employer
+object. This way, if we later need to re-examine this employee object,
+the pointer will already be loaded. </p><p class="p">请注意，在for循环中，我们使用对惰性弱指针的引用，而不是创建副本。这不仅仅是为了避免复制。加载惰性指针时，指向同一对象的所有其他惰性指针不会自动加载(尽管尝试加载此类副本将导致它们指向同一对象，前提是同一会话仍然有效)。通过在上述事务中使用引用，我们确保加载包含在雇主对象中的指针。这样，如果我们以后需要重新检查这个employee对象，指针将已经被加载。</p><p class="p">As another example, suppose we want to add an employee to Example
+Inc. The straightforward implementation of this transaction is presented
+below:</p><p class="p">作为另一个示例，假设我们想向example Inc.添加一名员工。下面给出了该事务的简单实现：</p><p class="p"></p><p class="p">session s;</p><p class="p">transaction t (db.begin ());</p><p class="p">shared_ptr&lt;employer&gt;
+er (db.load&lt;employer&gt; ("Example Inc"));</p><p class="p">shared_ptr&lt;employee&gt;
+e (new employee ("John", "Doe"));</p><p class="p">e-&gt;employer_ = er;</p><p class="p">er-&gt;employees
+().push_back (e);</p><p class="p">db.persist (e);</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">Notice here that we didn't have to update the employer object
+in the database since the employees_ list of pointers is an inverse
+side of a bidirectional relationship and is effectively read-only,
+from the persistence point of view.</p><p class="p">&nbsp;注意，这里我们不必更新数据库中的employer对象，因为employees_
+list指针列表是双向关系的反面，从持久性的角度来看，它实际上是只读的。</p><p class="p">A faster implementation
+of this transaction, that avoids loading the employer object, relies
+on the ability to initialize an unloaded lazy pointer with the database
+where the object is stored as well as its identifier:</p><p class="p">此事务的更快实现(避免加载雇主对象)依赖于使用存储对象的数据库及其标识符初始化卸载的惰性指针的能力：</p><p class="p"></p><p class="p">lazy_shared_ptr&lt;employer&gt; er (db, std::string ("Example
+Inc"));</p><p class="p">shared_ptr&lt;employee&gt; e (new employee ("John", "Doe"));</p><p class="p">e-&gt;employer_ = er;</p><p class="p">session s;</p><p class="p">transaction t (db.begin
+());</p><p class="p">db.persist (e);</p><p class="p">t.commit ();</p><p class="p"></p><p class="p">For the
+interaction of lazy pointers with lazy-loaded object sections, refer
+to Section 9.3, "Sections and Lazy Pointers".</p><p class="p">关于惰性指针与惰性加载对象Section的交互，请参考9.3节“Section和惰性指针”。</p><p class="p">6.5 Using Custom Smart Pointers&nbsp; 使用自定义智能指针</p><p class="p">While the
+ODB runtime and profile libraries provide support for the majority
+of widely-used pointers, it is also easy to add support for a custom
+smart pointer. </p><p class="p">虽然ODB运行时和概要文件库为大多数广泛使用的指针提供支持，但添加对自定义智能指针的支持也很容易。</p><p class="p">To achieve this you will need to implement the pointer_traits
+class template specialization for your pointer. The first step is
+to determine the pointer kind since the interface of the pointer_traits
+specialization varies depending on the pointer kind. The supported
+pointer kinds are: raw (raw pointer or equivalent, that is, unmanaged),
+unique (smart pointer that doesn't support sharing), shared (smart
+pointer that supports sharing), and weak (weak counterpart of the
+shared pointer). Any of these pointers can be lazy, which also affects
+the interface of the pointer_traits specialization. </p><p class="p">要实现这一点，您需要为指针实现指针类模板专门化。第一步是确定指针的种类，因为指针的接口因指针种类而异。支持的指针类型有：原始指针(原始指针或等效指针，即非托管)、唯一指针(不支持共享的智能指针)、共享指针(支持共享的智能指针)和弱指针(共享指针的弱对应物)。这些指针中的任何一个都可能是惰性的，这也会影响指针的接口。</p><p class="p">Once you have determined the pointer kind for your smart pointer,
+use a specialization for one of the standard pointers found in the
+common ODB runtime library (libodb) as a base for your own implementation.</p><p class="p">&nbsp;一旦确定了智能指针的指针类型，请使用公共ODB运行时库(libodb)中的一个标准指针的专门化作为您自己实现的基础。</p><p class="p">Once the pointer traits specialization is ready, you will need
+to include it into the ODB compilation process using the --odb-epilogue
+option and into the generated header files with the --hxx-prologue
+option. As an example, suppose we have the smart_ptr smart pointer
+for which we have the traits specialization implemented in the smart-ptr-traits.hxx
+file. Then, we can create an ODB compiler options file for this pointer
+and save it to smart-ptr.options:</p><p class="p">一旦指针特性专门化就绪，您将需要使用--ODB epilogue选项将其包含到ODB编译过程中，并使用--hxx
+prologue选项将其包含到生成的头文件中。例如，假设我们有smart_ptr智能指针，我们在smart ptr traits中为其实现了traits专门化。hxx文件。然后，我们可以为该指针创建一个ODB编译器选项文件，并将其保存到smart
+ptr。选项：</p><p class="p"># Options file for smart_ptr.</p><p class="p">#</p><p class="p">--odb-epilogue
+'#include "smart-ptr-traits.hxx"'</p><p class="p">--hxx-prologue '#include "smart-ptr-traits.hxx"'</p><p class="p">Now, whenever we compile a header file that uses smart_ptr, we
+can specify the following command line option to make sure it is recognized
+by the ODB compiler as a smart pointer and the traits file is included
+in the generated code:</p><p class="p">现在，每当我们编译使用smart_ptr的头文件时，我们都可以指定以下命令行选项，以确保ODB编译器将其识别为智能指针，并且traits文件包含在生成的代码中：</p><p class="p">--options-file smart-ptr.options</p><p class="p">It is also possible to
+implement a lazy counterpart for your smart pointer. The ODB runtime
+library provides a class template that encapsulates the object id
+management and loading functionality that is needed to implement a
+lazy pointer. All you need to do is wrap it with an interface that
+mimics your smart pointer. Using one of the existing lazy pointer
+implementations (either from the ODB runtime library or one of the
+profile libraries) as a base for your implementation is the easiest
+way to get started.</p><p class="p">也可以为您的智能指针实现一个懒惰的对应项。ODB运行时库提供了一个类模板，它封装了实现惰性指针所需的对象id管理和加载功能。你所需要做的就是用一个模仿你的智能指针的界面来包装它。使用一个现有的惰性指针实现(来自ODB运行时库或一个概要文件库)作为实现的基础是最简单的入门方法。</p><p class="p">&nbsp;</p></section>
+<section class="section"><h2 class="title sectiontitle">6.1 单向关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.1.1 一对一关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.1.2 对多关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.2 双向关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.2.1 一对一关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.2.2 一对多关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.2.3 多对多关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.3 循环关系</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.4 惰性指针</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">6.5 使用自定义智能指针</h2><p class="p"></p></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>

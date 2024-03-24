@@ -1,0 +1,251 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>Sections节</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="Sections节-5E0D48D5"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">Sections节</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">9 节</h2><p class="p">ODB sections 是一种优化机制，它允许我们将持久类的数据成员划分为可以单独加载和/或更新的组。例如，如果一个对象包含加载或更新数据成员(如blob或容器)的开销较大，并且访问或修改的频率较低，那么这就很有用。例如:</p><p class="p">#include &lt;odb/section.hxx&gt;</p><p class="p">#pragma db object</p><p class="p">class
+person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db load(lazy)
+update(manual)</p><p class="p">&nbsp; odb::section keys_;</p><p class="p">&nbsp; #pragma
+db section(keys_) type("BLOB")</p><p class="p">&nbsp; char public_key_[1024];</p><p class="p">&nbsp; #pragma db section(keys_) type("BLOB")</p><p class="p">&nbsp; char
+private_key_[1024];</p><p class="p">};</p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;person&gt; p (db.load&lt;person&gt; (...)); // Keys are
+not loaded.</p><p class="p">if (need_keys)</p><p class="p">{</p><p class="p">&nbsp; db.load (*p,
+p-&gt;keys_); // Load keys.</p><p class="p">&nbsp; ...</p><p class="p">}</p><p class="p">db.update
+(*p); // Keys are not updated.</p><p class="p">if (update_keys)</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; db.update (*p, p-&gt;keys_); // Update keys.</p><p class="p">}</p><p class="p">t.commit ();</p><p class="p">A complete example that shows how to
+use sections is available in the section directory in the odb-examples
+package.</p><p class="p">在odb-examples包中的section目录中有一个完整的示例，展示了如何使用section。</p><p class="p">Why do we need to group data members into sections? Why can't
+each data member be loaded and updated independently if and when necessary?
+The reason for this requirement is that loading or updating a group
+of data members with a single database statement is significantly
+more efficient than loading or updating each data member with a separate
+statement. Because ODB prepares and caches statements used to load
+and update persistent objects, generating a custom statement for a
+specific set of data members that need to be loaded or updated together
+is not a viable approach either. To resolve this, ODB allows us to
+group data members that are often updated and/or loaded together into
+sections. To achieve the best performance, we should aim to find a
+balance between having too many sections with too few data members
+and too few sections with too many data members. We can use the access
+and modification patterns of our application as a base for this decision.</p><p class="p">为什么需要将数据成员分组到节中?为什么不能在必要时独立加载和更新每个数据成员?这一需求的原因是，用一条数据库语句加载或更新一组数据成员要比用一条单独的语句加载或更新每个数据成员效率高得多。因为ODB准备和缓存用于加载和更新持久对象的语句，所以为一组需要一起加载或更新的特定数据成员生成自定义语句也不是一种可行的方法。为了解决这个问题，ODB允许我们将经常被更新和/或装载到一起的数据成员分组。为了实现最佳性能，我们应该在太多的section中包含太少的数据成员，以及太少的section中包含太多的数据成员之间找到一种平衡。我们可以使用应用程序的访问和修改模型作为此决策的基础。 </p><p class="p">To add a new section to a persistent class we declare a new data
+member of the odb::section type. At this point we also need to specify
+the loading and updating behavior of this section with the db load
+and db update pragmas, respectively.</p><p class="p">要向持久化类添加新节，需要声明odb::section类型的新数据成员。在这一点上，我们还需要用db
+load和db update pragmas分别指定这一节的加载和更新行为。 </p><p class="p">The loading behavior
+of a section can be either eager or lazy. An eager-loaded section
+is always loaded as part of the object load. A lazy-loaded section
+is not loaded as part of the object load and has to be explicitly
+loaded with the database::load() function (discussed below) if and
+when necessary.</p><p class="p">section的加载行为可以是即时的，也可以是惰性的。一个紧急加载的节总是作为对象加载的一部分被加载。惰性加载区段不是作为对象加载的一部分加载的，必须在必要时使用数据库::load()函数显式加载(稍后讨论)。 </p><p class="p">The updating behavior of a section can be always, change, or manual.
+An always-updated section is always updated as part of the object
+update, provided it has been loaded. A change-updated section is only
+updated as part of the object update if it has been loaded and marked
+as changed. A manually-updated section is never updated as part of
+the object update and has to be explicitly updated with the database::update()
+function (discussed below) if and when necessary.</p><p class="p">section的更新行为可以是always、change或manual。一个总是更新的节总是作为对象更新的一部分进行更新，前提是它已经被加载。如果已加载并标记为已更改，则更改更新的部分仅作为对象更新的一部分进行更新。手动更新的区段永远不会作为对象更新的一部分进行更新，必须在必要时使用database::update()函数显式更新(将在下面讨论)。 </p><p class="p">If no loading behavior is specified explicitly, then an eager-loaded
+section is assumed. Similarly, if no updating behavior is specified,
+then an always-updated section is assumed. An eager-loaded, always-updated
+section is pointless and therefore illegal. Only persistent classes
+with an object id can have sections.</p><p class="p">如果没有显式指定加载行为，则假定为一个紧急加载section。类似地，如果没有指定更新行为，则假定总是更新section。急于加载、总是更新的secton是无意义的，因此是非法的。只有具有对象id的持久化类才能有section。 </p><p class="p">To specify that a data member belongs to a section we use the
+db section pragma with the section's member name as its single argument.
+Except for special data members such as the object id and optimistic
+concurrency version, any direct, non-transient member of a persistent
+class can belong to a section, including composite values, containers,
+and pointers to objects. For example:</p><p class="p">要指定一个数据成员属于一个section，我们使用db
+section pragma，并将section的成员名作为它的单个参数。除了特殊的数据成员，如对象id和乐观并发版本，持久类的任何直接、非临时成员都可以属于一个节，包括复合值、容器和对象指针。例如:</p><p class="p">#pragma db value</p><p class="p">class text</p><p class="p">{</p><p class="p">&nbsp; std::string
+data;</p><p class="p">&nbsp; std::string lang;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db
+load(lazy)</p><p class="p">&nbsp; odb::section extras_;</p><p class="p">&nbsp; #pragma
+db section(extras_)</p><p class="p">&nbsp; text bio_;</p><p class="p">&nbsp; #pragma db
+section(extras_)</p><p class="p">&nbsp; std::vector&lt;std::string&gt; nicknames_;</p><p class="p">&nbsp; #pragma db section(extras_)</p><p class="p">&nbsp; std::shared_ptr&lt;person&gt;
+emergency_contact_;</p><p class="p">};</p><p class="p">An empty section is pointless and
+therefore illegal, except in abstract or polymorphic classes where
+data members can be added to a section by derived classes (see Section
+9.1, "Sections and Inheritance").</p><p class="p">空的section是无意义的，因此是非法的，除非在抽象类或多态类中，数据成员可以通过派生类添加到section中(参见9.1节“section和继承”)。</p><p class="p">The odb::section class is defined in the &lt;odb/section.hxx&gt;
+header file and has the following interface:</p><p class="p">section类定义在&lt;odb/section.hxx&gt;
+头文件，具有以下接口:</p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; class section</p><p class="p">&nbsp; {</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp; // Load
+state.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; bool</p><p class="p">&nbsp;&nbsp;&nbsp; loaded () const;</p><p class="p">&nbsp;&nbsp;&nbsp; void</p><p class="p">&nbsp;&nbsp;&nbsp; unload ();</p><p class="p">&nbsp;&nbsp;&nbsp; // Change
+state.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; bool</p><p class="p">&nbsp;&nbsp;&nbsp; changed () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+void</p><p class="p">&nbsp;&nbsp;&nbsp; change ();</p><p class="p">&nbsp;&nbsp;&nbsp;
+// User data.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp;
+unsigned char</p><p class="p">&nbsp;&nbsp;&nbsp; user_data () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+void</p><p class="p">&nbsp;&nbsp;&nbsp; user_data (unsigned char);</p><p class="p">&nbsp;
+};</p><p class="p">}</p><p class="p">The loaded() accessor can be used to determine whether
+a section is already loaded. The unload() modifier marks a loaded
+section as not loaded. This, for example, can be useful if you don't
+want the section to be reloaded during the object reload.</p><p class="p">可使用loaded()访问器来确定一个section是否已经被加载。unload()修饰符将已加载的部分标记为未加载。例如，如果您不希望在对象重载期间重新加载section，这可能很有用。 </p><p class="p">The changed() accessor can be used to query the section's change
+state. The change() modifier marks the section as changed. It is valid
+to call this modifier for an unloaded (or transient) section, however,
+the state will be reset back to unchanged once the section (or object)
+is loaded. The change state is only relevant to sections with change-updated
+behavior and is ignored for all other sections.</p><p class="p">可以使用changed()访问器来查询该节的更改状态。change()修饰符将该部分标记为已更改。对于未加载(或瞬态)的section，调用这个修饰符是有效的，但是，一旦section(或对象)被加载，状态将被重置为未更改。更改状态只与具有更改更新行为的部分相关，而对于所有其他部分将被忽略。 </p><p class="p">The size of the section class is one byte with four bits available
+to store a custom state via the user_data() accessor and modifier.</p><p class="p">section类的大小是一个字节，四个字节可用来通过user_data()访问器和修饰符存储自定义状态。 </p><p class="p">The
+odb::database class provides special versions of the load() and update()
+functions that allow us to load and update sections of a persistent
+class. Their signatures are as follows:</p><p class="p">database类提供了load()和update()函数的特殊版本，允许我们加载和更新持久类的部分。他们的签名如下:</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp;
+load (T&amp; object, section&amp;);</p><p class="p">&nbsp; template &lt;typename
+T&gt;</p><p class="p">&nbsp; void</p><p class="p">&nbsp; update (const T&amp; object, const
+section&amp;);</p><p class="p">Before calling the section load() function, the
+object itself must already be loaded. If the section is already loaded,
+then the call to load() will reload its data members. It is illegal
+to explicitly load an eager-loaded section.</p><p class="p">在调用section load()函数之前，对象本身必须已经被加载。如果区段已经加载，则调用load()将重新加载其数据成员。显式加载一个紧急加载的节是非法的。 </p><p class="p">Before calling the section update() function, the section (and
+therefore the object) must be in the loaded state. If the section
+is not loaded, the odb::section_not_loaded exception is thrown. The
+section update() function does not check but does clear the section's
+change state. In other words, section update() will always update
+section data members in the database and clear the change flag. Note
+also that any section, that is, always-, change-, or manually-updated,
+can be explicitly updated with this function.</p><p class="p">在调用section update()函数之前，section(以及对象)必须处于加载状态。如果未加载该节，则抛出odb::section_not_loaded异常。section
+update()函数不检查，但会清除section的更改状态。换句话说，section update()将始终更新数据库中的section数据成员并清除更改标志。还要注意的是，任何部分，即始终更新、更改更新或手动更新，都可以用这个函数显式地更新。 </p><p class="p">Both section load() and update(), just like the rest of the database
+operations, must be performed within a transaction. Notice also that
+both load() and update() expect a reference to the section as their
+second argument. This reference must refer to the data member in the
+object passed as the first argument. If instead it refers to some
+other instance of the section class, for example, a local copy or
+a temporary, then the odb::section_not_in_object exception is thrown.
+For example:</p><p class="p">section load()和update()都必须在事务中执行，就像数据库的其他操作一样。还请注意，load()和update()都期望将对section的引用作为它们的第二个参数。该引用必须引用作为第一个参数传递的对象中的数据成员。如果它引用了section类的其他实例，例如本地副本或临时实例，则抛出odb::section_not_in_object异常。例如:</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; odb::section</p><p class="p">&nbsp; keys () const
+{return keys_;}</p><p class="p">private:</p><p class="p">&nbsp; odb::section keys_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">auto_ptr&lt;person&gt; p (db.load&lt;person&gt;
+(...));</p><p class="p">section s (p-&gt;keys ());</p><p class="p">db.load (*p, s);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Throw section_not_in_object, copy.</p><p class="p">db.update (*p, p-&gt;keys
+()); // Throw section_not_in_object, copy.</p><p class="p">At first glance it
+may seem more appropriate to make the section class non-copyable in
+order to prevent such errors from happening. However, it is perfectly
+reasonable to expect to be able to copy (or assign) sections as part
+of the object copying (or assignment). As a result, sections are left
+copyable and copy-assignable, however, this functionality should not
+be used in accessors or modifiers. Instead, section accessors and
+modifiers should always be by-reference. Here is how we can fix our
+previous example:</p><p class="p">乍一看，使section类不可复制似乎更合适，以防止此类错误的发生。然而，完全有理由期望能够复制(或赋值)部分作为对象复制(或赋值)的一部分。因此，section是可复制和可复制赋值的，但是，这个功能不应该在访问器或修饰器中使用。相反，节访问器和修饰器应该始终是引用的。下面是我们如何修复我们之前的例子:</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; const odb::section&amp;</p><p class="p">&nbsp; keys
+() const {return keys_;}</p><p class="p">&nbsp; odb::section&amp;</p><p class="p">&nbsp;
+keys () {return keys_;}</p><p class="p">private:</p><p class="p">&nbsp; odb::section keys_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">auto_ptr&lt;person&gt; p (db.load&lt;person&gt;
+(...));</p><p class="p">section&amp; s (p-&gt;keys ());</p><p class="p">db.load (*p, s);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Ok, reference.</p><p class="p">db.update (*p, p-&gt;keys ()); // Ok, reference.</p><p class="p">Several other database operations affect sections. The state of
+a section in a transient object is undefined. That is, before the
+call to object persist() or load() functions, or after the call to
+object erase() function, the values returned by the section::loaded()
+and section::changed() accessors are undefined.</p><p class="p">其他一些数据库操作也会影响sections。瞬态对象中的section的状态是未定义的。也就是说，在调用对象persist()或load()函数之前，或在调用对象erase()函数之后，section::loaded()和section::changed()访问器返回的值是未定义的。 </p><p class="p">After the call to persist(), all sections, including eager-loaded
+ones, are marked as loaded and unchanged. If instead we are loading
+an object with the load() call or as a result of a query, then eager-loaded
+sections are loaded and marked as loaded and unchanged while lazy-loaded
+ones are marked as unloaded. If a lazy-loaded section is later loaded
+with the section load() call, then it is marked as loaded and unchanged.</p><p class="p">在调用persist()之后，所有部分，包括紧急加载的部分，都被标记为已加载和未更改。相反，如果我们是通过load()调用加载一个对象，或者作为查询的结果加载一个对象，那么急于加载的部分将被加载并标记为已加载和未更改，而延迟加载的部分将被标记为未加载。如果稍后使用节load()调用来加载一个惰性加载的section
+，那么它将被标记为已加载且未更改。 </p><p class="p">When we update an object with the update()
+call, manually-updated sections are ignored while always-updated sections
+are updated if they are loaded. Change-updated sections are only updated
+if they are both loaded and marked as changed. After the update, such
+sections are reset to the unchanged state. When we reload an object
+with the reload() call, sections that were loaded are automatically
+reloaded and reset to the unchanged state.‘’</p><p class="p">当我们用update()调用更新一个对象时，手动更新的部分会被忽略，而总是更新的部分会在加载后被更新。更改更新的部分只有在加载并标记为更改时才会更新。更新之后，这些部分被重置为未更改的状态。当我们使用reload()调用重新加载一个对象时，已加载的部分将自动重新加载并重置为未更改的状态。</p><p class="p">To further illustrate the state transitions of a section, consider
+this example:</p><p class="p">为了进一步说明一个区段的状态转换，考虑下面的例子:</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db
+load(lazy) update(change)</p><p class="p">&nbsp; odb::section keys_;</p><p class="p">&nbsp;
+...</p><p class="p">};</p><p class="p">transaction t (db.begin ());</p><p class="p">person p ("John",
+"Doe"); // Section state is undefined (transient).</p><p class="p">db.persist
+(p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //
+Section state: loaded, unchanged.</p><p class="p">auto_ptr&lt;person&gt; l (</p><p class="p">&nbsp; db.load&lt;person&gt; (...)); // Section state: unloaded,
+unchanged.</p><p class="p">db.update (*l);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section not updated since not loaded.</p><p class="p">db.update (p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section not updated since not changed.</p><p class="p">p.keys_.change ();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section state: loaded, changed.</p><p class="p">db.update (p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section updated, state: loaded, unchanged.</p><p class="p">db.update (*l,
+l-&gt;keys_); // Throw section_not_loaded.</p><p class="p">db.update (p, p.keys_);&nbsp;&nbsp;
+// Section updated even though not changed.</p><p class="p">db.reload (*l);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section not reloaded since not loaded.</p><p class="p">db.reload (p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section reloaded, state: loaded, unchanged.</p><p class="p">db.load (*l,
+l-&gt;keys_);&nbsp;&nbsp; // Section loaded, state: loaded, unchanged.</p><p class="p">db.load (p, p.keys_);&nbsp;&nbsp;&nbsp;&nbsp; // Section reloaded,
+state: loaded, unchanged.</p><p class="p">db.erase (p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Section state is undefined (transient).</p><p class="p">t.commit ();</p><p class="p">When using change-updated behavior, it is our responsibility to mark
+the section as changed when any of the data members belonging to this
+section is modified. A natural place to mark the section as changed
+is the modifiers for section data members, for example:</p><p class="p">在使用更改更新行为时，当属于该节的任何数据成员被修改时，我们有责任将该节标记为已更改。将节标记为已更改的一个自然位置是节数据成员的修饰符，例如:</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; typedef std::array&lt;char, 1024&gt; key_type;</p><p class="p">&nbsp;
+const key_type&amp;</p><p class="p">&nbsp; public_key () const {return public_key_;}</p><p class="p">&nbsp; void</p><p class="p">&nbsp; public_key (const key_type&amp; k)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; public_key_ = k;</p><p class="p">&nbsp;&nbsp;&nbsp;
+keys_.change ();</p><p class="p">&nbsp; }</p><p class="p">&nbsp; const key_type&amp;</p><p class="p">&nbsp; private_key () const {return private_key_;}</p><p class="p">&nbsp;
+void</p><p class="p">&nbsp; private_key (const key_type&amp; k)</p><p class="p">&nbsp;
+{</p><p class="p">&nbsp;&nbsp;&nbsp; private_key_ = k;</p><p class="p">&nbsp;&nbsp;&nbsp;
+keys_.change ();</p><p class="p">&nbsp; }</p><p class="p">private:</p><p class="p">&nbsp; #pragma
+db load(lazy) update(change)</p><p class="p">&nbsp; odb::section keys_;</p><p class="p">&nbsp; #pragma db section(keys_) type("BLOB")</p><p class="p">&nbsp; key_type
+public_key_;</p><p class="p">&nbsp; #pragma db section(keys_) type("BLOB")</p><p class="p">&nbsp; key_type private_key_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">One interesting aspect of change-updated sections is what happens
+when a transaction that performed an object or section update is later
+rolled back. In this case, while the change state of a section has
+been reset (after update), actual changes were not committed to the
+database. Change-updated sections handle this case by automatically
+registering a rollback callback and then, if it is called, restoring
+the original change state. The following code illustrates this semantics
+(continuing with the previous example):</p><p class="p">更改更新区段的一个有趣方面是，当执行对象或区段更新的事务稍后回滚时，会发生什么情况。在这种情况下，虽然部分的更改状态已经重置(在更新之后)，但实际的更改没有提交到数据库。更改更新部分通过自动注册回滚回调来处理这种情况，然后，如果调用它，则恢复原始更改状态。下面的代码演示了这个语义(继续前面的例子):</p><p class="p">auto_ptr&lt;person&gt; p;</p><p class="p">try</p><p class="p">{</p><p class="p">&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp; p = db.load&lt;person&gt; (...);</p><p class="p">&nbsp; db.load (*p, p-&gt;keys_);</p><p class="p">&nbsp; p-&gt;private_key (new_key);
+// The section is marked changed.</p><p class="p">&nbsp; db.update (*p);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// The section is reset to unchanged.</p><p class="p">&nbsp; throw failed ();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Triggers rollback.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">catch
+(const failed&amp;)</p><p class="p">{</p><p class="p">&nbsp; // The section is restored
+back to changed.</p><p class="p">}</p><p class="p">9.1 Sections and Inheritance section和继承</p><p class="p">With both reuse and polymorphism inheritance (Chapter 8, "Inheritance")
+it is possible to add new sections to derived classes. It is also
+possible to add data members from derived classes to sections declared
+in the base. For example:</p><p class="p">通过重用和多态性继承(第8章，“继承”)，可以向派生类中添加新的部分。也可以将派生类的数据成员添加到基类中声明的节中。例如:</p><p class="p">#pragma db object polymorphic</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; virtual void</p><p class="p">&nbsp; print ();</p><p class="p">&nbsp; #pragma db load(lazy)</p><p class="p">&nbsp; odb::section print_;</p><p class="p">&nbsp; #pragma db section(print_)</p><p class="p">&nbsp; std::string bio_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee: public person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; virtual void</p><p class="p">&nbsp; print
+();</p><p class="p">&nbsp; #pragma db section(print_)</p><p class="p">&nbsp; std::vector&lt;std::string&gt;
+employment_history_;</p><p class="p">};</p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;person&gt; p (db.load&lt;person&gt; (...)); // Person or
+employee.</p><p class="p">db.load (*p, p-&gt;print_); // Load data members needed
+for print.</p><p class="p">p-&gt;print ();</p><p class="p">t.commit ();</p><p class="p">When data members
+of a section are spread over several classes in a reuse inheritance
+hierarchy, both section load and update are performed with a single
+database statement. In contrast, with polymorphism inheritance, section
+load is performed with a single statement while update requires a
+separate statement for each class that adds to the section.</p><p class="p">当一个section的数据成员分布在重用继承层次结构中的几个类中时，section的加载和更新都是通过一个数据库语句来执行的。相反，使用多态性继承，section的加载是用一个语句执行的，而更新需要为每个添加到section的类使用一个单独的语句。 </p><p class="p">Note also that in polymorphism inheritance the section-to-object
+association is static. Or, in other words, you can load a section
+via an object only if its static type actually contains this section.
+The following example will help illustrate this point further:</p><p class="p">还要注意，在多态性继承中，段到对象的关联是静态的。或者，换句话说，只有当对象的静态类型实际包含这个section时，才可以通过对象加载该section。下面的例子将有助于进一步说明这一点:</p><p class="p">#pragma db object polymorphic</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee:
+public person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db load(lazy)</p><p class="p">&nbsp; odb::section extras_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">#pragma
+db object</p><p class="p">class manager: public employee</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">};</p><p class="p">auto_ptr&lt;manager&gt; m (db.load&lt;manager&gt; (...));</p><p class="p">person&amp; p (*m);</p><p class="p">employee&amp; e (*m);</p><p class="p">section&amp;
+s (m-&gt;extras_);</p><p class="p">db.load (p, s); // Error: extras_ is not in
+person.</p><p class="p">db.load (e, s); // Ok: extras_ is in employee.</p><p class="p">&nbsp; </p><p class="p">9.2 Sections and Optimistic Concurrency&nbsp; Sections
+和乐观并发</p><p class="p">When sections are used in a class with the optimistic
+concurrency model (Chapter 12, "Optimistic Concurrency"), both section
+update and load operations compare the object version to that in the
+database and throw the odb::object_changed exception if they do not
+match. In addition, the section update operation increments the version
+to indicate that the object state has changed. For example:</p><p class="p">当section在类中使用乐观并发模型(第12章，“乐观并发”)时，section更新和加载操作都将对象版本与数据库中的版本进行比较，如果不匹配，则抛出odb::object_changed异常。此外，节更新操作增加版本以表明对象状态已经改变。例如:</p><p class="p">#pragma db object optimistic</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db version</p><p class="p">&nbsp; unsigned
+long long version_;</p><p class="p">&nbsp; #pragma db load(lazy)</p><p class="p">&nbsp;
+odb::section extras_;</p><p class="p">&nbsp; #pragma db section(extras_)</p><p class="p">&nbsp; std::string bio_;</p><p class="p">};</p><p class="p">auto_ptr&lt;person&gt; p;</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; p = db.load&lt;person&gt;
+(...);</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">{</p><p class="p">&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp; try</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+db.load (*p, p-&gt;extras_); // Throws if object state has changed.</p><p class="p">&nbsp; }</p><p class="p">&nbsp; catch (const object_changed&amp;)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; db.reload (*p);</p><p class="p">&nbsp;&nbsp;&nbsp;
+db.load (*p, p-&gt;extras_); // Cannot fail.</p><p class="p">&nbsp; }</p><p class="p">&nbsp;
+t.commit ();</p><p class="p">}</p><p class="p">Note also that if an object update triggers
+one or more section updates, then each such update will increment
+the object version. As a result, an update of an object that contains
+sections may result in a version increment by more than one.</p><p class="p">还要注意的是，如果一个对象更新触发了一个或多个部分的更新，那么每次这样的更新都会增加对象的版本。因此，包含section的对象的更新可能导致版本增量大于1。 </p><p class="p">When sections are used together with optimistic concurrency and
+inheritance, an extra step may be required to enable this functionality.
+If you plan to add new sections to derived classes, then the root
+class of the hierarchy (the one that declares the version data member)
+must be declared as sectionable with the db sectionable pragma. For
+example:</p><p class="p">当部分与乐观并发和继承一起使用时，可能需要额外的步骤来启用此功能。如果你计划在派生类中添加新的section，那么这个层次结构的根类(声明版本数据成员的那个)必须用db
+sectionable pragma声明为可分段的。例如:</p><p class="p">#pragma db object polymorphic
+sectionable</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp;
+#pragma db version</p><p class="p">&nbsp; unsigned long long version_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class employee: public person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db load(lazy)</p><p class="p">&nbsp;
+odb::section extras_;</p><p class="p">&nbsp; #pragma db section(extras_)</p><p class="p">&nbsp; std::vector&lt;std::string&gt; employment_history_;</p><p class="p">};</p><p class="p">This requirement has to do with the need to generate extra
+version increment code in the root class that will be used by sections
+added in the derived classes. If you forget to declare the root class
+as sectionable and later add a section to one of the derived classes,
+the ODB compiler will issue diagnostics.</p><p class="p">这个需求与在根类中生成额外版本增量代码的需要有关，这些代码将被添加到派生类中的部分使用。如果忘记将根类声明为可分段的，并在以后向其中一个派生类添加一个分段，ODB编译器将发出诊断。 </p><p class="p">9.3 Sections and Lazy Pointers&nbsp;&nbsp;&nbsp; Sections&nbsp;
+和延迟指针</p><p class="p">If a lazy pointer (Section 6.4, "Lazy Pointers") belongs
+to a lazy-loaded section, then we end up with two levels of lazy loading.
+Specifically, when the section is loaded, the lazy pointer is initialized
+with the object id but the object itself is not loaded. For example:</p><p class="p">&nbsp;如果一个延迟指针(第6.4节，“延迟指针”)属于一个延迟加载的部分，那么我们最终会得到两个级别的延迟加载。具体来说，当section被加载时，延迟指针被初始化为对象id，但对象本身没有被加载。例如:</p><p class="p">#pragma db object</p><p class="p">class employee</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db load(lazy)</p><p class="p">&nbsp; odb::section extras_;</p><p class="p">&nbsp; #pragma db section(extras_)</p><p class="p">&nbsp; odb::lazy_shared_ptr&lt;employer&gt;
+employer_;</p><p class="p">};</p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;employee&gt;
+e (db.load&lt;employee&gt; (...)); // employer_ is NULL.</p><p class="p">db.load
+(*e, e-&gt;extras_); // employer_ contains valid employer id.</p><p class="p">e-&gt;employer_.load
+(); // employer_ points to employer object.</p><p class="p">t.commit ();</p><p class="p">9.4 Sections and Change-Tracking Containers&nbsp;&nbsp;&nbsp;
+Sections 和变更跟踪容器</p><p class="p">If a change-tracking container (Section 5.4,
+"Change-Tracking Containers") belongs to a change-updated section,
+then prior to an object update ODB will check if the container has
+been changed and if so, automatically mark the section as changed.
+For example:</p><p class="p">如果一个变更跟踪容器(第5.4节，“变更跟踪容器”)属于一个变更更新的部分，那么在对象更新之前，ODB将检查该容器是否已更改，如果已更改，则自动将该部分标记为已更改。例如:</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp;&nbsp;#pragma db load(lazy) update(change)</p><p class="p">&nbsp;
+odb::section extras_;</p><p class="p">&nbsp; #pragma db section(extras_)</p><p class="p">&nbsp; odb::vector&lt;std::string&gt; nicknames_;</p><p class="p">};</p><p class="p">transaction t (db.begin ());</p><p class="p">auto_ptr&lt;person&gt; p (db.load&lt;person&gt;
+(...));</p><p class="p">db.load (*p, p-&gt;extras_);</p><p class="p">p-&gt;nicknames_.push_back
+("JD");</p><p class="p">db.update (*p); // Section is automatically updated
+even</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// though it was not marked as changed.</p><p class="p">t.commit ();</p><p class="p">&nbsp;</p></section>
+<section class="section"><h2 class="title sectiontitle">9.1 节和继承</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">9.2 段和乐观并发</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">9.3 节和惰性指针</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">9.4 部分和更改跟踪容器</h2><p class="p"></p></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>ValueTypes值类型</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="ValueTypes值类型-5E0D2D46"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">ValueTypes值类型</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">7 值类型</h2><p class="p">在第3.1节“概念和术语”中，我们已经讨论了值和值类型的概念以及简单值和复合值之间的区别。本章将更详细地介绍简单值和复合值类型。</p><p class="p">7.1 Simple Value Types&nbsp; 简单值类型</p><p class="p">A simple value type is
+a fundamental C++ type or a class type that is mapped to a single
+database column. For each supported database system the ODB compiler
+provides a default mapping to suitable database types for most fundamental
+C++ types, such as int or float as well as some class types, such
+as std::string. For more information about the default mapping for
+each database system refer to Part II, Database Systems. We can also
+provide a custom mapping for these or our own value types using the
+db type pragma (Section 14.3.1, "type").</p><p class="p">一个简单的值类型是一个基本的C++类型或映射到单个数据库列的类类型。对于每个支持的数据库系统，ODB编译器为最基本的C++类型提供了默认映射到合适的数据库类型，例如int或浮点以及一些类类型，例如std::string。有关每个数据库系统的默认映射的更多信息，请参阅第二部分“数据库系统”。我们还可以使用db
+type pragma(第14.3.1节“类型”)为这些或我们自己的值类型提供自定义映射。</p><p class="p">7.2 Composite
+Value Types&nbsp; 复合值类型</p><p class="p">A composite value type is a class or
+struct type that is mapped to more than one database column. To declare
+a composite value type we use the db value pragma, for example:</p><p class="p">复合值类型是映射到多个数据库列的类或结构类型。要声明复合值类型，我们使用db value pragma，例如：</p><p class="p">#pragma db value</p><p class="p">class basic_name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">The complete version of the above code fragment and the
+other code samples presented in this section can be found in the composite
+example in the odb-examples package.</p><p class="p">上述代码片段的完整版本和本节中介绍的其他代码示例可以在odb-examples包中的composite
+示例中找到。 </p><p class="p">A composite value type does not have to define a default
+constructor, unless it is used as an element of a container. In this
+case the default constructor can be made private provided we also
+make the odb::access class, defined in the &lt;odb/core.hxx&gt; header,
+a friend of this value type. For example:</p><p class="p">复合值类型不必定义默认构造函数，除非它用作容器的元素。在这种情况下，可以将默认构造函数设置为私有，前提是我们还设置了在&lt;odb/core.hxx&gt;头中定义的odb:：access类为此值类型的友元类。例如：</p><p class="p">#include &lt;odb/core.hxx&gt;</p><p class="p">#pragma db value</p><p class="p">class
+basic_name</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; basic_name (const std::string&amp;
+first, const std::string&amp; last);</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; friend class odb::access;</p><p class="p">&nbsp; basic_name () {}
+// Needed for storing basic_name in containers.</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">The ODB compiler also needs access to the non-transient
+(Section 14.4.11, "transient") data members of a composite value type.
+It uses the same mechanisms as for persistent classes which are discussed
+in Section 3.2, "Declaring Persistent Objects and Values".</p><p class="p">ODB编译器还需要访问复合值类型的非瞬态(第14.4.11节，“瞬态”)数据成员。它使用与第3.2节“声明持久对象和值”中讨论的持久类相同的机制。 </p><p class="p">The members of a composite value can be other value types (either
+simple or composite), containers (Chapter 5, "Containers"), and pointers
+to objects (Chapter 6, "Relationships"). Similarly, a composite value
+type can be used in object members, as an element of a container,
+and as a base for another composite value type. In particular, composite
+value types can be used as element types in set containers (Section
+5.2, "Set and Multiset Containers") and as key types in map containers
+(Section 5.3, "Map and Multimap Containers"). A composite value type
+that is used as an element of a container cannot contain other containers
+since containers of containers are not allowed. The following example
+illustrates some of the possible use cases:</p><p class="p">复合值的成员可以是其他值类型(简单或复合)、容器(第5章“容器”)和指向对象的指针(第6章“关系”)。类似地，复合值类型可以在对象成员中用作容器的元素，也可以用作另一种复合值类型的基础。特别是，复合值类型可以用作集合容器(第5.2节“集合和多集合容器”)中的元素类型，也可以用作映射容器(第5.3节“映射和多映射容器”)中的键类型。用作容器元素的复合值类型不能包含其他容器，因为不允许容器的容器。以下示例说明了一些可能的用例：</p><p class="p">#pragma db value</p><p class="p">class basic_name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">typedef std::vector&lt;basic_name&gt; basic_names;</p><p class="p">#pragma db value</p><p class="p">class name_extras</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string nickname_;</p><p class="p">&nbsp; basic_names aliases_;</p><p class="p">};</p><p class="p">#pragma db value</p><p class="p">class name: public basic_name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string title_;</p><p class="p">&nbsp;
+name_extras extras_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class
+person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">A composite value type can be defined inside a persistent class,
+view, or another composite value and even made private, provided we
+make odb::access a friend of the containing class, for example:</p><p class="p">&nbsp;复合值类型可以在持久类、视图或其他复合值中定义，甚至可以设置为私有，只要我们使odb:：access成为包含类的友元类，例如：</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db value</p><p class="p">&nbsp; class name</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;&nbsp;&nbsp; std::string first_;</p><p class="p">&nbsp;&nbsp;&nbsp; std::string last_;</p><p class="p">&nbsp; };</p><p class="p">&nbsp;
+name name_;</p><p class="p">};</p><p class="p">A composite value type can also be defined
+as an instantiation of a C++ class template, for example:</p><p class="p">复合值类型也可以定义为C++类模板的实例化，例如：</p><p class="p">template &lt;typename T&gt;</p><p class="p">struct point</p><p class="p">{</p><p class="p">&nbsp;
+T x;</p><p class="p">&nbsp; T y;</p><p class="p">&nbsp; T z;</p><p class="p">};</p><p class="p">typedef point&lt;int&gt;
+int_point;</p><p class="p">#pragma db value(int_point)</p><p class="p">#pragma db object</p><p class="p">class object</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; int_point center_;</p><p class="p">};</p><p class="p">Note that the database support code for such a composite
+value type is generated when compiling the header containing the db
+value pragma and not the header containing the template definition
+or the typedef name. This allows us to use templates defined in other
+files, such as std::pair defined in the utility standard header file:</p><p class="p">请注意，这种复合值类型的数据库支持代码是在编译包含db value pragma的标头时生成的，而不是在编译包含模板定义或typedef名称的标头时生成的。这允许我们使用在其他文件中定义的模板，例如在实用程序标准头文件中定义的std::pair</p><p class="p">#include &lt;utility&gt; // std::pair</p><p class="p">typedef std::pair&lt;std::string,
+std::string&gt; phone_numbers;</p><p class="p">#pragma db value(phone_numbers)</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; phone_numbers phone_;</p><p class="p">};</p><p class="p">We can also use data
+members from composite value types in database queries (Chapter 4,
+"Querying the Database"). For each composite value in a persistent
+class, the query class defines a nested member that contains members
+corresponding to the data members in the value type. We can then use
+the member access syntax (.) to refer to data members in value types.
+For example, the query class for the person object presented above
+contains the name member (its name is derived from the name_ data
+member) which in turn contains the extras member (its name is derived
+from the name::extras_ data member of the composite value type). This
+process continues recursively for nested composite value types and,
+as a result, we can use the query::name.extras.nickname expression
+while querying the database for the person objects. For example:</p><p class="p">我们还可以在数据库查询中使用来自复合值类型的数据成员(第4章，“查询数据库”)。对于持久类中的每个复合值，查询类定义了一个嵌套成员，其中包含与值类型中的数据成员相对应的成员。然后我们可以使用成员访问语法(.)引用值类型中的数据成员。例如，上面显示的person对象的查询类包含name成员(其名称派生自name_数据成员)，而name成员又包含extras成员(其名称派生自复合值类型的name::xtras_数据成员)。对于嵌套的复合值类型，此过程将以递归方式继续，因此，我们可以使用query::name.extras.nickname查询数据库中的person对象时的昵称表达式。例如：</p><p class="p">typedef odb::query&lt;person&gt; query;</p><p class="p">typedef odb::result&lt;person&gt;
+result;</p><p class="p">transaction t (db.begin ());</p><p class="p">result r (db.query&lt;person&gt;
+(</p><p class="p">&nbsp; query::name.extras.nickname == "Squeaky"));</p><p class="p">...</p><p class="p">t.commit ();</p><p class="p">7.2.1 Composite Object Ids 复合对象Ids</p><p class="p">An
+object id can be of a composite value type, for example:</p><p class="p">对象id可以是复合值类型，例如：</p><p class="p">#pragma db value</p><p class="p">class name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">However, a value type that can be used as an object id has a number
+of restrictions. Such a value type cannot have container, object pointer,
+or read-only data members. It also must be default-constructible,
+copy-constructible, and copy-assignable. Furthermore, if the persistent
+class in which this composite value type is used as object id has
+session support enabled (Chapter 11, "Session"), then it must also
+implement the less-than comparison operator (operator&lt;).</p><p class="p">但是，可以用作对象id的值类型有许多限制。此类值类型不能具有容器、对象指针或只读数据成员。它还必须是默认可构造、可复制可构造和可复制可分配的。此外，如果将此复合值类型用作对象id的持久类启用了会话支持(第11章“会话”)，则它还必须实现小于比较运算符(运算符&lt;)。</p><p class="p">7.2.2 Composite Value Column and Table Names 复合值列和表名</p><p class="p">Customizing
+a column name for a data member of a simple value type is straightforward:
+we simply specify the desired name with the db column pragma (Section
+14.4.9, "column"). For composite value types things are slightly more
+complex since they are mapped to multiple columns. Consider the following
+example:</p><p class="p">为简单值类型的数据成员自定义列名非常简单，我们只需使用 db column pragma(第14.4.9节“列”)指定所需的名称。对于复合值类型，情况稍微复杂一些，因为它们映射到多个列。考虑下面的例子：</p><p class="p">#pragma db value</p><p class="p">class name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db id auto</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">The column names for the first_
+and last_ members are constructed by using the sanitized name of the
+person::name_ member as a prefix and the names of the members in the
+value type (first_ and last_) as suffixes. As a result, the database
+schema for the above classes will look like this:</p><p class="p">first_和last_成员的列名是通过使用person::name_成员的净化名称作为前缀，使用值类型(first_和last_)中成员的名称作为后缀来构造的。因此，上述类的数据库架构如下所示：</p><p class="p">CREATE TABLE person (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL
+PRIMARY KEY,</p><p class="p">&nbsp; name_first TEXT NOT NULL,</p><p class="p">&nbsp; name_last
+TEXT NOT NULL);</p><p class="p">We can customize both the prefix and the suffix
+using the db column pragma as shown in the following example:</p><p class="p">我们可以使用db column&nbsp; pragma自定义前缀和后缀，如下例所示：</p><p class="p">#pragma db value</p><p class="p">class name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db column("first_name")</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; #pragma db column("last_name")</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma db
+column("person_")</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">The database
+schema changes as follows:</p><p class="p">CREATE TABLE person (</p><p class="p">&nbsp;
+id BIGINT UNSIGNED NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; person_first_name
+TEXT NOT NULL,</p><p class="p">&nbsp; person_last_name TEXT NOT NULL);</p><p class="p">We can also make the column prefix empty, for example:</p><p class="p">#pragma
+db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp;
+#pragma db column("")</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">This
+will result in the following schema:</p><p class="p">CREATE TABLE person (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY KEY,</p><p class="p">&nbsp; first_name
+TEXT NOT NULL,</p><p class="p">&nbsp; last_name TEXT NOT NULL);</p><p class="p">The same
+principle applies when a composite value type is used as an element
+of a container, except that instead of db column, either the db value_column
+(Section 14.4.36, "value_column") or db key_column (Section 14.4.35,
+"key_column") pragmas are used to specify the column prefix.</p><p class="p">当复合值类型用作容器的元素时，同样的原则也适用，除了使用db value_column (第14.4.36节“value_column
+”)或db key_column (第14.4.35节“key_column ”)pragmas 来指定列前缀而不是db column。 </p><p class="p">When a composite value type contains a container, an extra table
+is used to store its elements (Chapter 5, "Containers"). The names
+of such tables are constructed in a way similar to the column names,
+except that by default both the object name and the member name are
+used as a prefix. For example: </p><p class="p">当复合值类型包含容器时，将使用一个额外的表来存储其元素(第5章“容器”)。这些表的名称的构造方式与列名类似，只是默认情况下对象名和成员名都用作前缀。例如：</p><p class="p">#pragma db value</p><p class="p">class name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">&nbsp; std::vector&lt;std::string&gt; nicknames_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">&nbsp; </p><p class="p">The corresponding
+database schema will look like this:</p><p class="p">CREATE TABLE person_name_nicknames
+(</p><p class="p">&nbsp; object_id BIGINT UNSIGNED NOT NULL,</p><p class="p">&nbsp; index
+BIGINT UNSIGNED NOT NULL,</p><p class="p">&nbsp; value TEXT NOT NULL)</p><p class="p">CREATE TABLE person (</p><p class="p">&nbsp; id BIGINT UNSIGNED NOT NULL PRIMARY
+KEY,</p><p class="p">&nbsp; name_first TEXT NOT NULL,</p><p class="p">&nbsp; name_last
+TEXT NOT NULL);</p><p class="p">To customize the container table name we can
+use the db table pragma (Section 14.4.20, "table"), for example:</p><p class="p">要自定义容器表名称，我们可以使用db table pragma(第14.4.20节，“表”)，例如：</p><p class="p">#pragma
+db value</p><p class="p">class name</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; #pragma
+db table("nickname")</p><p class="p">&nbsp; std::vector&lt;std::string&gt; nicknames_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; #pragma db table("person_")</p><p class="p">&nbsp; name name_;</p><p class="p">};</p><p class="p">This will result in the following schema changes:</p><p class="p">CREATE TABLE person_nickname (</p><p class="p">&nbsp; object_id BIGINT UNSIGNED
+NOT NULL,</p><p class="p">&nbsp; index BIGINT UNSIGNED NOT NULL,</p><p class="p">&nbsp;
+value TEXT NOT NULL)</p><p class="p">Similar to columns, we can make the table
+prefix empty.</p><p class="p">与列类似，我们可以将表前缀设为空。</p><p class="p">7.3 Pointers and NULL
+Value Semantics&nbsp; 指针和空值语义</p><p class="p">Relational database systems have
+a notion of the special NULL value that is used to indicate the absence
+of a valid value in a column. While by default ODB maps values to
+columns that do not allow NULL values, it is possible to change that
+with the db null pragma (Section 14.4.6, "null/not_null").</p><p class="p">关系数据库系统有一个特殊空值的概念，用于指示列中缺少有效值。虽然默认情况下ODB将值映射到不允许空值的列，但可以使用db
+null pragma(第14.4.6节“NULL/not_NULL”)更改该值。 </p><p class="p">To properly support
+the NULL semantics, the C++ value type must have a notion of a NULL
+value or a similar special state concept. Most basic C++ types, such
+as int or std::string, do not have this notion and therefore cannot
+be used directly for NULL-enabled data members (in the case of a NULL
+value being loaded from the database, such data members will be default-initialized).</p><p class="p">为了正确地支持空语义，C++值类型必须具有空值或类似的特殊状态概念。大多数基本的C++类型，如int或std::string，都没有这个概念，因此不能直接用于启用NULL的数据成员(在从数据库加载空值的情况下，这样的数据成员将默认初始化)。 </p><p class="p">To allow the easy conversion of value types that do not support
+the NULL semantics into the ones that do, ODB provides the odb::nullable
+class template. It allows us to wrap an existing C++ type into a container-like
+class that can either be NULL or contain a value of the wrapped type.
+ODB also automatically enables the NULL values for data members of
+the odb::nullable type. For example:</p><p class="p">为了方便地将不支持NULL语义的值类型转换为支持NULL语义的值类型，ODB提供了ODB:：nullable类模板。它允许我们将现有C++类型封装成容器类，它可以是null，也可以包含包装类型的值。ODB还自动为ODB:：nullable类型的数据成员启用空值。例如：</p><p class="p">#include &lt;odb/nullable.hxx&gt;</p><p class="p">#pragma db object</p><p class="p">class
+person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// TEXT NOT NULL</p><p class="p">&nbsp; odb::nullable&lt;std::string&gt; middle_;&nbsp;&nbsp;&nbsp;
+// TEXT NULL</p><p class="p">&nbsp; std::string last_;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;// TEXT NOT NULL</p><p class="p">};</p><p class="p">The odb::nullable
+class template is defined in the &lt;odb/nullable.hxx&gt; header file
+and has the following interface:</p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; template &lt;typename T&gt;</p><p class="p">&nbsp; class nullable</p><p class="p">&nbsp; {</p><p class="p">&nbsp; public:</p><p class="p">&nbsp;&nbsp;&nbsp; typedef T
+value_type;</p><p class="p">&nbsp;&nbsp;&nbsp; nullable ();</p><p class="p">&nbsp;&nbsp;&nbsp;
+nullable (const T&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; nullable (const
+nullable&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; template &lt;typename Y&gt;
+explicit nullable (const nullable&lt;Y&gt;&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+nullable&amp; operator= (const T&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; nullable&amp;
+operator= (const nullable&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; template
+&lt;typename Y&gt; nullable&amp; operator= (const nullable&lt;Y&gt;&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; void swap (nullable&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp;
+// Accessor interface.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp;
+bool null () const;</p><p class="p">&nbsp;&nbsp;&nbsp; T&amp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+get ();</p><p class="p">&nbsp;&nbsp;&nbsp; const T&amp; get () const;</p><p class="p">&nbsp;&nbsp;&nbsp; // Pointer interface.</p><p class="p">&nbsp;&nbsp;&nbsp;
+//</p><p class="p">&nbsp;&nbsp;&nbsp; operator bool_convertible () const;</p><p class="p">&nbsp;&nbsp;&nbsp; T*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; operator-&gt;
+();</p><p class="p">&nbsp;&nbsp;&nbsp; const T* operator-&gt; () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+T&amp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; operator* ();</p><p class="p">&nbsp;&nbsp;&nbsp;
+const T&amp; operator* () const;</p><p class="p">&nbsp;&nbsp;&nbsp; // Reset
+to the NULL state.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp;
+void reset ();</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p">&nbsp; </p><p class="p">The following
+example shows how we can use this interface:</p><p class="p">&nbsp; nullable&lt;string&gt;
+ns;</p><p class="p">&nbsp; // Using the accessor interface.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; if (ns.null ())</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+s = "abc";</p><p class="p">&nbsp; }</p><p class="p">&nbsp; else</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+string s (ns.get ());</p><p class="p">&nbsp;&nbsp;&nbsp; ns.reset ();</p><p class="p">&nbsp; }</p><p class="p">&nbsp; // The same using the pointer interface.</p><p class="p">&nbsp; //</p><p class="p">&nbsp; if (ns)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+s = "abc";</p><p class="p">&nbsp; }</p><p class="p">&nbsp; else</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;
+string s (*ns);</p><p class="p">&nbsp;&nbsp;&nbsp; ns.reset ();</p><p class="p">&nbsp;
+}</p><p class="p">The odb::nullable class template requires the wrapped type
+to have public default and copy constructors as well as the copy assignment
+operator. Note also that the odb::nullable implementation is not the
+most efficient in that it always contains a fully constructed value
+of the wrapped type. This is normally not a concern for simple types
+such as the C++ fundamental types or std::string. However, it may
+become an issue for more complex types. In such cases you may want
+to consider using a more efficient implementation of the optional
+value concept such as the optional class template from Boost (Section
+23.4, "Optional Library").</p><p class="p">odb::nullable 类模板要求包装类型具有公共默认构造函数和复制构造函数以及复制赋值运算符。还要注意，odb:：nullable实现并不是最有效的，因为它总是包含一个完全构造的包装类型的值。这通常不是简单类型的问题，例如C++基本类型或std::String。但是，对于更复杂的类型，这可能会成为一个问题。在这种情况下，您可能需要考虑使用更有效的实现可选值的概念，如Boost中的可选类模板(第23.4节，“可选库”)。</p><p class="p">Another common C++ representation of a value that can be NULL
+is a pointer. ODB will automatically handle data members that are
+pointers to values, however, it will not automatically enable NULL
+values for such data members, as is the case for odb::nullable. Instead,
+if the NULL value is desired, we will need to enable it explicitly
+using the db null pragma. For example:</p><p class="p">另一个可以为NULL的值的另一种常见的C++表示是指针。ODB将自动处理作为值指针的数据成员，但是，它不会像ODB:：nullable那样自动为这些数据成员启用空值。相反，如果需要NULL值，我们需要使用db
+null pragma显式地启用它。例如：</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::string first_;</p><p class="p">&nbsp;
+#pragma db null</p><p class="p">&nbsp; std::auto_ptr&lt;std::string&gt; middle_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">The ODB compiler includes
+built-in support for using std::auto_ptr, std::unique_ptr (C++11),
+and shared_ptr (TR1 or C++11) as pointers to values. Plus, ODB profile
+libraries, that are available for commonly used frameworks and libraries
+(such as Boost and Qt), provide support for smart pointers found in
+these frameworks and libraries (Part III, "Profiles").</p><p class="p">ODB编译器内置支持使用std:：auto_ptr、std:：unique_ptr(C++11)和shared_ptr(TR1或C++11)作为值指针。另外，ODB概要文件库可用于常用的框架和库(如Boost和Qt)，为这些框架和库中的智能指针提供支持(第三部分，“概要文件”)。 </p><p class="p">ODB also supports the NULL semantics for composite values. In
+the relational database the NULL composite value is translated to
+NULL values for all the simple data members of this composite value.
+For example:</p><p class="p">ODB还支持复合值的NULL语义。在关系数据库中，对于该复合值的所有简单数据成员，将NULL复合值转换为NULL值。例如：</p><p class="p">#pragma db value</p><p class="p">struct name</p><p class="p">{</p><p class="p">&nbsp; std::string
+first_;</p><p class="p">&nbsp; odb::nullable&lt;std::string&gt; middle_;</p><p class="p">&nbsp; std::string last_;</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; odb::nullable&lt;name&gt;
+name_;</p><p class="p">};</p><p class="p">ODB不支持容器的空语义。这也意味着包含容器的复合值不能为NULL。考虑到这个限制，我们仍然可以在容器类型的数据成员中使用智能指针。唯一的限制是这些指针不能为NULL。例如：</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">&nbsp; std::auto_ptr&lt;std::vector&lt;std::string&gt; &gt; aliases_;</p><p class="p">};</p><p class="p">&nbsp;</p></section>
+<section class="section"><h2 class="title sectiontitle">7.1 简单值类型</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">7.2 复合值类型</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">7.2.1 复合对象 ID</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">7.2.2 复合值列和表名</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">7.3 指针和空值语义</h2><p class="p"></p></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>
