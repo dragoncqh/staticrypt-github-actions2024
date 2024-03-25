@@ -1,0 +1,304 @@
+<!DOCTYPE html
+  SYSTEM "about:legacy-compat">
+<html lang="zh-cn"><head><meta charset="UTF-8"><meta name="copyright" content="(C) 版权 2024"><meta name="generator" content="DITA-OT"><meta name="description" content=""><title>container容器</title><link rel="stylesheet" type="text/css" href="../../commonltr.css"></head><body id="Container容器-5E0CC79C"><main role="main"><article role="article" aria-labelledby="ariaid-title1">
+<h1 class="title topictitle1" id="ariaid-title1">container容器</h1>
+
+
+<div class="body conbody"><p class="shortdesc"></p>
+<section class="section"><h2 class="title sectiontitle">5 容器</h2><p class="p">ODB运行库为所有常用的标准C++98/03容器提供内置持久性支持，即std:：vector、std:：list、std:：deque、std:：set、std:：multiset、std:：map和std:：multimap以及C++11
+std:：array、std:：forward_list、std:：unordered_set、std:：unordered_multiset、std:：unordered_map、，和std::unordered_multimap。另外，ODB概要文件库可用于常用的框架和库(如Boost和Qt)，为这些框架和库中的容器提供持久性支持(第三部分，“概要文件”)。ODB运行时库和概要文件库还提供了许多更改跟踪容器等价物，可用于最小化使容器状态与数据库同步所需的数据库操作数量(第5.4节，“更改跟踪容器”)。如第5.5节“使用自定义容器”中所述，保存自定义容器类型也很容易。 </p><p class="p">We don't need to do anything special to declare a member of a
+container type in a persistent class. For example: </p><p class="p">我们不需要做任何特殊的事情来声明持久类中容器类型的成员。例如：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">private:</p><p class="p">&nbsp; std::vector&lt;std::string&gt; nicknames_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">The complete version of the above
+code fragment and the other code samples presented in this chapter
+can be found in the container example in the odb-examples package. </p><p class="p">上述代码片段的完整版本和本章中介绍的其他代码示例可以在odb-examples包中的container 示例中找到。 </p><p class="p">A data member in a persistent class that is of a container type
+behaves like a value type. That is, when an object is made persistent,
+the elements of the container are stored in the database. Similarly,
+when a persistent object is loaded from the database, the contents
+of the container are automatically loaded as well. A data member of
+a container type can also use a smart pointer, as discussed in Section
+7.3, "Pointers and NULL Value Semantics". </p><p class="p">容器类型的持久类中的数据成员的行为类似于值类型。也就是说，当对象被持久化时，容器的元素存储在数据库中。类似地，当从数据库加载持久对象时，容器的内容也会自动加载。容器类型的数据成员也可以使用智能指针，如第7.3节“指针和空值语义”所述。 </p><p class="p">While an ordinary member is mapped to one or more columns in the
+object's table, a member of a container type is mapped to a separate
+table. The exact schema of such a table depends on the kind of container.
+ODB defines the following container kinds: ordered, set, multiset,
+map, and multimap. The container kinds and the contents of the tables
+to which they are mapped are discussed in detail in the following
+sections.</p><p class="p">普通成员映射到对象表中的一列或多列时，容器类型的成员映射到单独的表。这种表的确切模型取决于容器的类型。ODB定义了以下容器类型：有序、集合、多集合、映射和多映射。容器类型及其映射到的表的内容将在以下部分中详细讨论。 </p><p class="p">Containers in ODB can contain simple value types (Section 7.1,
+"Simple Value Types"), composite value types (Section 7.2, "Composite
+Value Types"), and pointers to objects (Chapter 6, "Relationships").
+Containers of containers, either directly or indirectly via a composite
+value type, are not allowed. A key in a map or multimap container
+can be a simple or composite value type but not a pointer to an object.
+An index in the ordered container should be a simple integer value
+type.</p><p class="p">ODB中的容器可以包含简单值类型(第7.1节“简单值类型”)、复合值类型(第7.2节“复合值类型”)和指向对象的指针(第6章“关系”)。不允许通过复合值类型直接或间接使用容器的容器。映射或多重映射容器中的键可以是简单值类型或复合值类型，但不能是指向对象的指针。有序容器中的索引应该是简单的整数值类型。 </p><p class="p">The value type in the ordered, set, and map containers as well
+as the key type in the map containers should be default-constructible.
+The default constructor in these types can be made private in which
+case the odb::access class should be made a friend of the value or
+key type. For example: </p><p class="p">ordered、set和map容器中的值类型以及map容器中的键类型应该是默认可构造的。这些类型中的默认构造函数可以成为私有的，在这种情况下，odb:：access类应该成为值或键类型的友元类。例如：</p><p class="p"></p><p class="p">#pragma db value</p><p class="p">class name</p><p class="p">{</p><p class="p">public:</p><p class="p">&nbsp; name (const std::string&amp;, const std::string&amp;);</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; friend class odb::access;</p><p class="p">&nbsp; name ();</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp;
+std::vector&lt;name&gt; aliases_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">5.1 Ordered Containers</p><p class="p">In ODB an ordered container is any
+container that maintains (explicitly or implicitly) an order of its
+elements in the form of an integer index. Standard C++ containers
+that are ordered include std::vector std::list, and std::deque as
+well as C++11 std::array and std::forward_list. While elements in
+std::set are also kept in a specific order, this order is not based
+on an integer index but rather on the relationship between elements.
+As a result, std::set is not considered an ordered container for the
+purpose of persistence. </p><p class="p">在ODB中，有序容器是以整数索引的形式(显式或隐式)维护其元素顺序的任何容器。标准C++容器包括
+std::vector, std::list，以及std::deque以及C++ 11 C++11 std::array和std::forward_list。虽然std:：set中的元素也按特定顺序保存，但这种顺序不是基于整数索引，而是基于元素之间的关系。因此，出于持久性的目的，std:：set不被视为有序容器。 </p><p class="p">The database table for an ordered container consists of at least
+three columns. The first column contains the object id of a persistent
+class instance of which the container is a member. The second column
+contains the element index within a container. And the last column
+contains the element value. If the object id or element value are
+composite, then, instead of a single column, they can occupy multiple
+columns. For an ordered container table the ODB compiler also defines
+two indexes: one for the object id column(s) and the other for the
+index column. Refer to Section 14.7, "Index Definition Pragmas" for
+more information on how to customize these indexes. </p><p class="p">有序容器的数据库表至少由三列组成。第一列包含容器是其成员的持久类实例的对象id。第二列包含容器中的元素索引。最后一列包含元素值。如果对象id或元素值是复合的，则它们可以占用多个列，而不是单个列。对于有序容器表，ODB编译器还定义了两个索引：一个用于对象id列，另一个用于索引列。有关如何自定义这些索引的更多信息，请参阅第14.7节“索引定义Pragmas”。</p><p class="p">&nbsp;以下面的持久对象为例：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; #pragma db id auto</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; std::vector&lt;std::string&gt;
+nicknames_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">The resulting database
+table (called person_nicknames) will contain the object id column
+of type unsigned long (called object_id), the index column of an integer
+type (called index), and the value column of type std::string (called
+value). </p><p class="p">生成的数据库表(称为person_nicknames)将包含unsigned long类型的object
+id列(称为object_id)、integer类型的index列(称为index)和std:：string类型的value列(称为value)。 </p><p class="p">A number of ODB pragmas allow us to customize the table name,
+column names, and native database types of an ordered container both,
+on the per-container and per-member basis. For more information on
+these pragmas, refer to Chapter 14, "ODB Pragma Language". The following
+example shows some of the possible customizations: </p><p class="p">许多ODB pragmas允许我们在每个容器和每个成员的基础上自定义有序容器的表名、列名和本机数据库类型。有关这些Pragma的更多信息，请参阅第14章“ODB
+Pragma语言”。以下示例显示了一些可能的自定义设置：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp;
+#pragma db table("nicknames")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+\</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+id_column("person_id")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+\</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+index_type("SMALLINT UNSIGNED") \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+index_column("nickname_number") \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_type("VARCHAR(255)")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_column("nickname")</p><p class="p">&nbsp; std::vector&lt;std::string&gt;
+nicknames_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">While the C++ container
+used in a persistent class may be ordered, sometimes we may wish to
+store such a container in the database without the order information.
+In the example above, for instance, the order of person's nicknames
+is probably not important. To instruct the ODB compiler to ignore
+the order in ordered containers we can use the db unordered pragma
+(Section 14.3.9, "unordered", Section 14.4.19, "unordered"). For example: </p><p class="p">虽然在持久类中使用的C++容器可以被排序，但有时我们希望在没有订单信息的情况下将这样的容器存储在数据库中。例如，在上面的例子中，人的昵称顺序可能并不重要。为了指示ODB编译器忽略有序容器中的顺序，我们可以使用db
+unordered pragma(第14.3.9节“无序”，第14.4.19节“无序”)。例如：</p><p class="p"></p><p class="p">#pragma
+db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; #pragma db unordered</p><p class="p">&nbsp; std::vector&lt;std::string&gt;
+nicknames_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">The table for an
+ordered container that is marked unordered won't have the index column
+and the order in which elements are retrieved from the database may
+not be the same as the order in which they were stored. </p><p class="p">标记为无序的有序容器的表将不包含索引列，并且从数据库检索元素的顺序可能与它们的存储顺序不同。</p><p class="p">&nbsp;</p><p class="p">5.2 Set and Multiset Containers</p><p class="p">In ODB set
+and multiset containers (referred to as just set containers) are associative
+containers that contain elements based on some relationship between
+them. A set container may or may not guarantee a particular order
+of the elements that it stores. Standard C++ containers that are considered
+set containers for the purpose of persistence include std::set and
+std::multiset as well as C++11 std::unordered_set and std::unordered_multiset. </p><p class="p">在ODB中，集合和多集合容器(简称集合容器)是关联容器，包含基于它们之间某种关系的元素。集合容器可以保证也可以不保证它存储的元素的特定顺序。标准C++
+C++容器，它被认为是持久化的容器，包括std::set和std::multiset以及C++ 11 std::unordered_set和std::unordered_multiset。 </p><p class="p">The database table for a set container consists of at least two
+columns. The first column contains the object id of a persistent class
+instance of which the container is a member. And the second column
+contains the element value. If the object id or element value are
+composite, then, instead of a single column, they can occupy multiple
+columns. ODB compiler also defines an index on a set container table
+for the object id column(s). Refer to Section 14.7, "Index Definition
+Pragmas" for more information on how to customize this index. </p><p class="p">集合容器的数据库表至少由两列组成。第一列包含容器是其成员的持久类实例的对象id。第二列包含元素值。如果对象id或元素值是复合的，则它们可以占用多个列，而不是单个列。ODB编译器还为对象id列在集合容器表上定义索引。有关如何自定义此索引的更多信息，请参阅第14.7节“索引定义Pragmas”。 </p><p class="p">Consider the following persistent object as an example:</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">private:</p><p class="p">&nbsp; #pragma db id auto</p><p class="p">&nbsp; unsigned
+long id_;</p><p class="p">&nbsp; std::set&lt;std::string&gt; emails_;</p><p class="p">&nbsp;
+...</p><p class="p">};</p><p class="p"></p><p class="p">The resulting database table (called person_emails)
+will contain the object id column of type unsigned long (called object_id)
+and the value column of type std::string (called value). </p><p class="p">生成的数据库表(称为person_emails)将包含类型为unsigned
+long的object id列(称为object_id)和类型为std:：string的value列(称为value)。 </p><p class="p">A number of ODB pragmas allow us to customize the table name, column
+names, and native database types of a set container, both on the per-container
+and per-member basis. For more information on these pragmas, refer
+to Chapter 14, "ODB Pragma Language". The following example shows
+some of the possible customizations: </p><p class="p">许多ODB pragmas允许我们在每个容器和每个成员的基础上自定义集合容器的表名、列名和本机数据库类型。有关这些Pragma的更多信息，请参阅第14章“ODB
+Pragma语言”。以下示例显示了一些可能的自定义设置： </p><p class="p">以下面的持久对象为例：</p><p class="p"></p><p class="p">#pragma
+db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; #pragma db table("emails")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+\</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+id_column("person_id")&nbsp;&nbsp;&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_type("VARCHAR(255)") \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_column("email")</p><p class="p">&nbsp; std::set&lt;std::string&gt; emails_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">&nbsp;</p><p class="p">5.3 Map and Multimap
+Containers</p><p class="p">In ODB map and multimap containers (referred to as
+just map containers) are associative containers that contain key-value
+elements based on some relationship between keys. A map container
+may or may not guarantee a particular order of the elements that it
+stores. Standard C++ containers that are considered map containers
+for the purpose of persistence include std::map and std::multimap
+as well as C++11 std::unordered_map and std::unordered_multimap. </p><p class="p">在ODB中，map和multimap容器(简称为map容器)是基于键之间的某种关系包含键值元素的关联容器。映射容器可以保证也可以不保证它存储的元素的特定顺序。标准的C++容器，这些容器被认为是持久性的映射容器，包括std::map和std::multimap以及C++
+11 std::unordered_map和std::unordered_multimap。 </p><p class="p">The database
+table for a map container consists of at least three columns. The
+first column contains the object id of a persistent class instance
+of which the container is a member. The second column contains the
+element key. And the last column contains the element value. If the
+object id, element key, or element value are composite, then instead
+of a single column they can occupy multiple columns. ODB compiler
+also defines an index on a map container table for the object id column(s).
+Refer to Section 14.7, "Index Definition Pragmas" for more information
+on how to customize this index. </p><p class="p">映射容器的数据库表至少由三列组成。第一列包含容器是其成员的持久类实例的对象id。第二列包含元素键。最后一列包含元素值。如果对象id、元素键或元素值是复合的，则它们可以占用多个列，而不是单个列。ODB编译器还在映射容器表上为对象id列定义索引。有关如何自定义此索引的更多信息，请参阅第14.7节“索引定义杂注”。 </p><p class="p">Consider the following persistent object as an example: </p><p class="p">以下面的持久对象为例：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp; #pragma db id auto</p><p class="p">&nbsp; unsigned long id_;</p><p class="p">&nbsp; std::map&lt;unsigned short,
+float&gt; age_weight_map_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">The
+resulting database table (called person_age_weight_map) will contain
+the object id column of type unsigned long (called object_id), the
+key column of type unsigned short (called key), and the value column
+of type float (called value). </p><p class="p">生成的数据库表(称为person_age_weight_map)将包含类型为unsigned
+long的对象id列(称为object_id)、类型为unsigned short的键列(称为key)和类型为float的值列(称为value)。</p><p class="p">&nbsp;</p><p class="p">A number of ODB pragmas allow us to customize the
+table name, column names, and native database types of a map container,
+both on the per-container and per-member basis. For more information
+on these pragmas, refer to Chapter 14, "ODB Pragma Language". The
+following example shows some of the possible customizations: </p><p class="p">许多ODB pragmas允许我们在每个容器和每个成员的基础上自定义映射容器的表名、列名和本机数据库类型。有关这些Pragma的更多信息，请参阅第14章“ODB
+Pragma语言”。以下示例显示了一些可能的自定义设置：</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp; ...</p><p class="p">private:</p><p class="p">&nbsp;
+#pragma db table("weight_map")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+id_column("person_id")&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+key_type("INT UNSIGNED") \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+key_column("age")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_type("DOUBLE")&nbsp;&nbsp;&nbsp;&nbsp; \</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+value_column("weight")</p><p class="p">&nbsp; std::map&lt;unsigned short, float&gt;
+age_weight_map_;</p><p class="p">&nbsp; ...</p><p class="p">};</p><p class="p"></p><p class="p">&nbsp;</p><p class="p">5.4 Change-Tracking Containers</p><p class="p">When a persistent object
+containing one of the standard containers is updated in the database,
+ODB has no knowledge of which elements were inserted, erased, or modified.
+As a result, ODB has no choice but to assume the whole container has
+changed and update the state of every single element. This can result
+in a significant overhead if a container contains a large number of
+elements and we only changed a small subset of them. </p><p class="p">当数据库中包含一个标准容器的持久对象被更新时，ODB不知道插入、删除或修改了哪些元素。因此，ODB别无选择，只能假设整个容器已更改并更新每个元素的状态。如果一个容器包含大量元素，而我们只更改了其中的一小部分，那么这可能会导致很大的开销。 </p><p class="p">To eliminate this overhead, ODB provides a notion of change-tracking
+containers. A change-tracking container, besides containing its elements,
+just like an ordinary container, also includes the change state for
+each element. When it is time to update such a container in the database,
+ODB can use this change information to perform a minimum number of
+database operations necessary to synchronize the container state with
+the database. </p><p class="p">为了消除这种开销，ODB提供了更改跟踪容器的概念。变更跟踪容器除了包含其元素外，与普通容器一样，还包含每个元素的变更状态。当需要更新数据库中的此类容器时，ODB可以使用此更改信息执行使容器状态与数据库同步所需的最少数量的数据库操作。 </p><p class="p">The current version of the ODB runtime library provides a change-tracking
+equivalent of std::vector (Section 5.4.1, "Change-Tracking vector")
+with support for other standard container equivalents planned for
+future releases. ODB profile libraries also provide change-tracking
+equivalents for some containers found in the corresponding frameworks
+and libraries (Part III, "Profiles"). </p><p class="p">ODB运行时库的当前版本提供了std:：vector(第5.4.1节，“变更跟踪向量”)的变更跟踪等价物，并支持计划在未来版本中使用的其他标准容器等价物。ODB概要文件库还为相应框架和库(第三部分，“概要文件”)中的一些容器提供了更改跟踪等价物。 </p><p class="p">A change-tracking container equivalent can normally be used as
+a drop-in replacement for an ordinary container except for a few minor
+interface differences (discussed in the corresponding sub-sections).
+In particular, we don't need to do anything extra to effect change
+tracking. ODB will automatically start, stop, and reset change tracking
+when necessary. The following example illustrates this point using
+odb::vector as a replacement for std::vector. </p><p class="p">除了一些微小的接口差异(在相应的小节中讨论)，变更跟踪容器等效物通常可以作为普通容器的替代品。特别是，我们不需要做任何额外的事情来影响变更跟踪。ODB将在必要时自动启动、停止和重置更改跟踪。下面的示例使用odb:：vector替换std:：vector说明了这一点。</p><p class="p"></p><p class="p">#pragma db object</p><p class="p">class person</p><p class="p">{</p><p class="p">&nbsp;
+...</p><p class="p">&nbsp; odb::vector&lt;std::string&gt; names;</p><p class="p">};</p><p class="p">person p; // No change tracking (not persistent).</p><p class="p">p.names.push_back
+("John Doe");</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.persist (p); // Start change tracking (persistent).</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">p.names.push_back ("Johnny Doo");</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.update
+(p); // One INSERT; reset change state.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">p.names.modify (0) = "Doe, John"; // Instead of operator[].</p><p class="p">p.names.pop_back ();</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin
+());</p><p class="p">&nbsp; db.update (p); // One UPDATE, one DELETE; reset
+change state.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">{</p><p class="p">&nbsp;
+transaction t (db.begin ());</p><p class="p">&nbsp; auto_ptr&lt;person&gt; p1 (db.load&lt;person&gt;
+(...)); // Start change tracking.</p><p class="p">&nbsp; p1-&gt;names.insert (p1-&gt;names.begin
+(), "Joe Do");</p><p class="p">&nbsp; db.update (*p1); // One UPDATE, one INSERT;
+reset change state.</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.erase (p); //
+One DELETE; stop change tracking (not persistent).</p><p class="p">&nbsp; t.commit
+();</p><p class="p">}</p><p class="p"></p><p class="p">One interesting aspect of change tracking
+is what happens when a transaction that contains an update is later
+rolled back. In this case, while the change-tracking container has
+reset the change state (after update), actual changes were not committed
+to the database. Change-tracking containers handle this case by automatically
+registering a rollback callback and then, if it is called, marking
+the container as "completely changed". In this state, the container
+no longer tracks individual element changes and, when updated, falls
+back to the complete state update, just like an ordinary container.
+The following example illustrates this point: </p><p class="p">更改跟踪的一个有趣方面是，当包含更新的事务稍后回滚时会发生什么。在这种情况下，虽然更改跟踪容器已重置更改状态(更新后)，但实际更改未提交到数据库。更改跟踪容器通过自动注册回滚回调来处理这种情况，如果调用了回滚回调，则将容器标记为“完全更改”。在这种状态下，容器不再跟踪单个元素的更改，并且在更新时，会返回到完整的状态更新，就像普通容器一样。以下示例说明了这一点：</p><p class="p"></p><p class="p">person p;</p><p class="p">p.names.push_back ("John Doe");</p><p class="p">{</p><p class="p">&nbsp; transaction t (db.begin ());</p><p class="p">&nbsp; db.persist (p);
+// Start change tracking (persistent).</p><p class="p">&nbsp; t.commit ();</p><p class="p">}</p><p class="p">p.names.push_back ("Johnny Doo");</p><p class="p">for (;;)</p><p class="p">{</p><p class="p">&nbsp; try</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; transaction
+t (db.begin ());</p><p class="p">&nbsp;&nbsp;&nbsp; // First try: one INSERT.</p><p class="p">&nbsp;&nbsp;&nbsp; // Next try: one DELETE, two INSERTs.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; db.update (p); //
+Reset change state.</p><p class="p">&nbsp;&nbsp;&nbsp; t.commit (); // If throws
+(rollback), mark as completely changed.</p><p class="p">&nbsp;&nbsp;&nbsp; break;</p><p class="p">&nbsp; }</p><p class="p">&nbsp; catch (const odb::recoverable&amp;)</p><p class="p">&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp; continue;</p><p class="p">&nbsp; }</p><p class="p">}</p><p class="p"></p><p class="p">For the interaction of change-tracking containers
+with change-updated object sections, refer to Section 9.4, "Sections
+and Change-Tracking Containers". </p><p class="p">有关更改跟踪容器与更改更新对象部分的交互，请参阅第9.4节“部分和更改跟踪容器”。 </p><p class="p">5.4.1 Change-Tracking vector</p><p class="p">Class template odb::vector,
+defined in &lt;odb/vector.hxx&gt;, is a change-tracking equivalent for
+std::vector. It is implemented in terms of std::vector and is implicit-convertible
+to and implicit-constructible from const std::vector&amp;. In particular,
+this means that we can use odb::vector instance anywhere const std::vector&amp;
+is expected. In addition, odb::vector constant iterator (const_iterator)
+is the same type as that of std::vector. </p><p class="p">类模板odb:：vector，在&lt;odb/vector.hxx&gt;中定义，是std:：vector的变更跟踪等价物。它是根据std:：vector实现的，可以隐式转换为const
+std:：vector，也可以从const std:：vector&amp;隐式构造。特别是，这意味着我们可以在任何需要const
+std:：vector&amp;的地方使用odb:：vector实例。此外，odb:：vector常量迭代器(const_迭代器)与std:：vector的类型相同。 </p><p class="p">odb::vector incurs 2-bit per element overhead in order to store
+the change state. It cannot be stored unordered in the database (Section
+14.4.19 "unordered") but can be used as an inverse side of a relationship
+(6.2 "Bidirectional Relationships"). In this case, no change tracking
+is performed since no state for such a container is stored in the
+database. </p><p class="p">为了存储更改状态，vector会产生每元素2位的开销。它不能无序地存储在数据库中(第14.4.19节“无序”)，但可以用作关系的反面(6.2“双向关系”)。在这种情况下，不会执行更改跟踪，因为数据库中没有存储此类容器的状态。 </p><p class="p">The number of database operations required to update the state
+of odb::vector corresponds well to the complexity of std::vector functions.
+In particular, adding or removing an element from the back of the
+vector (for example, with push_back() and pop_back()), requires only
+a single database statement execution. In contrast, inserting or erasing
+an element somewhere in the middle of the vector will require a database
+statement for every element that follows it. </p><p class="p">更新odb:：vector状态所需的数据库操作数与std:：vector函数的复杂性很好地对应。特别是从vector后面添加或删除元素(例如，使用push_back()和pop_back())只需要执行一个数据库语句。相反，在向量中间插入或擦除某个元素将需要对它后面的每个元素都有一个数据库语句。 </p><p class="p">odb::vector replicates most of the std::vector interface as defined
+in both C++98/03 and C++11 standards. However, functions and operators
+that provide direct write access to the elements had to be altered
+or disabled in order to support change tracking. Additional functions
+used to interface with std::vector and to control the change tracking
+state were also added. The following listing summarizes the differences
+between the odb::vector and std::vector interfaces. Any std::vector
+function or operator not mentioned in this listing has exactly the
+same signature and semantics in odb::vector. Functions and operators
+that were disabled are shown as commented out and are followed by
+functions/operators that replace them. </p><p class="p">odb:：vector复制了C++98/03和C++11标准中定义的大多数std:：vector接口。但是，为了支持更改跟踪，必须更改或禁用对元素提供直接写访问的函数和运算符。还添加了用于与std:：vector接口和控制更改跟踪状态的附加函数。下面的列表总结了odb:：vector和std:：vector接口之间的区别。本清单中未提及的任何std:：vector函数或运算符在odb:：vector中具有完全相同的签名和语义。禁用的函数和运算符显示为注释掉，后面是替换它们的函数/运算符。</p><p class="p"></p><p class="p">namespace odb</p><p class="p">{</p><p class="p">&nbsp; template &lt;class T,
+class A = std::allocator&lt;T&gt; &gt;</p><p class="p">&nbsp; class vector</p><p class="p">&nbsp;
+{</p><p class="p">&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;&nbsp;&nbsp; // Element
+access.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; //reference
+operator[] (size_type);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; reference
+modify (size_type);</p><p class="p">&nbsp;&nbsp;&nbsp; //reference at (size_type);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; reference modify_at (size_type);</p><p class="p">&nbsp;&nbsp;&nbsp; //reference front ();</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+reference modify_front ();</p><p class="p">&nbsp;&nbsp;&nbsp; //reference back
+();</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; reference modify_back ();</p><p class="p">&nbsp;&nbsp;&nbsp; //T*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+data () noexcept;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; T*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+modify_data () noexcept; // C++11 only.</p><p class="p">&nbsp;&nbsp;&nbsp; //
+Iterators.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; typedef
+typename std::vector&lt;T, A&gt;::const_iterator const_iterator;</p><p class="p">&nbsp;&nbsp;&nbsp; class iterator</p><p class="p">&nbsp;&nbsp;&nbsp; {</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ...</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+// Element Access.</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+//reference&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; operator* () const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const_reference operator*
+() const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; reference&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+modify () const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //pointer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+operator-&gt; () const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+const_pointer operator-&gt; () const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+//reference&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; operator[] (difference_type);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; const_reference operator[]
+(difference_type);</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+reference&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; modify (difference_type)
+const;</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // Interfacing with std::vector::iterator.</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+typename std::vector&lt;T, A&gt;::iterator base () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+};</p><p class="p">&nbsp;&nbsp;&nbsp; // Return std::vector iterators. The begin()
+functions mark</p><p class="p">&nbsp;&nbsp;&nbsp; // all the elements as modified.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; typename std::vector&lt;T,
+A&gt;::iterator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; mbegin
+();</p><p class="p">&nbsp;&nbsp;&nbsp; typename std::vector&lt;T, A&gt;::iterator&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+mend ();</p><p class="p">&nbsp;&nbsp;&nbsp; typename std::vector&lt;T, A&gt;::reverse_iterator
+mrbegin ();</p><p class="p">&nbsp;&nbsp;&nbsp; typename std::vector&lt;T, A&gt;::reverse_iterator
+mrend ();</p><p class="p">&nbsp;&nbsp;&nbsp; // Interfacing with std::vector.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; vector (const std::vector&lt;T,
+A&gt;&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; vector (std::vector&lt;T, A&gt;&amp;&amp;);
+// C++11 only.</p><p class="p">&nbsp;&nbsp;&nbsp; vector&amp; operator= (const
+std::vector&lt;T, A&gt;&amp;);</p><p class="p">&nbsp;&nbsp;&nbsp; vector&amp; operator=
+(std::vector&lt;T, A&gt;&amp;&amp;); // C++11 only.</p><p class="p">&nbsp;&nbsp;&nbsp;
+operator const std::vector&lt;T, A&gt;&amp; () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+std::vector&lt;T, A&gt;&amp; base ();</p><p class="p">&nbsp;&nbsp;&nbsp; const
+std::vector&lt;T, A&gt;&amp; base ();</p><p class="p">&nbsp;&nbsp;&nbsp; // Change
+tracking.</p><p class="p">&nbsp;&nbsp;&nbsp; //</p><p class="p">&nbsp;&nbsp;&nbsp; bool
+_tracking () const;</p><p class="p">&nbsp;&nbsp;&nbsp; void _start () const;</p><p class="p">&nbsp;&nbsp;&nbsp; void _stop () const;</p><p class="p">&nbsp;&nbsp;&nbsp;
+void _arm (transaction&amp;) const;</p><p class="p">&nbsp; };</p><p class="p">}</p><p class="p"></p><p class="p">The following example highlights some of the differences between
+the two interfaces. std::vector versions are commented out.</p><p class="p">下面的示例强调了这两个接口之间的一些差异。std:：vector版本被注释掉。</p><p class="p"></p><p class="p">#include &lt;vector&gt;</p><p class="p">#include &lt;odb/vector.hxx&gt;</p><p class="p">void f (const std::vector&lt;int&gt;&amp;);</p><p class="p">odb::vector&lt;int&gt; v ({1, 2, 3});</p><p class="p">f (v); // Ok, implicit
+conversion.</p><p class="p">if (v[1] == 2) // Ok, const access.</p><p class="p">&nbsp;
+//v[1]++;</p><p class="p">&nbsp; v.modify (1)++;</p><p class="p">//v.back () = 4;</p><p class="p">v.modify_back () = 4;</p><p class="p">for (auto i (v.begin ()); i != v.end
+(); ++i)</p><p class="p">{</p><p class="p">&nbsp; if (*i != 0) // Ok, const access.</p><p class="p">&nbsp;&nbsp;&nbsp; //*i += 10;</p><p class="p">&nbsp;&nbsp;&nbsp; i.modify
+() += 10;</p><p class="p">}</p><p class="p">std::sort (v.mbegin (), v.mend ());</p><p class="p"></p><p class="p">Note also the subtle difference between copy/move construction
+and copy/move assignment of odb::vector instances. While copy/move
+constructor will copy/move both the elements as well as their change
+state, in contrast, assignment is tracked as any other change to the
+vector content. </p><p class="p">还要注意odb:：vector实例的复制/移动构造和复制/移动分配之间的细微差别。虽然复制/移动构造函数将复制/移动两个元素及其更改状态，但与此相反，对向量内容的任何其他更改都会跟踪赋值。</p><p class="p">&nbsp;</p><p class="p">5.5 Using Custom Containers</p><p class="p">While the ODB runtime
+and profile libraries provide support for a wide range of containers,
+it is also easy to persist custom container types or make a change-tracking
+version out of one. </p><p class="p">虽然ODB运行时和概要文件库提供了对多种容器的支持，但保存自定义容器类型或使用其中一种类型创建更改跟踪版本也很容易。 </p><p class="p">To achieve this you will need to implement the container_traits
+class template specialization for your container. First, determine
+the container kind (ordered, set, multiset, map, or multimap) for
+your container type. Then use a specialization for one of the standard
+C++ containers found in the common ODB runtime library (libodb) as
+a base for your own implementation. </p><p class="p">要实现这一点，您需要为您的容器实现容器类模板专门化。首先，确定容器类型的容器类型(有序、集合、多集、映射或多映射)。然后，使用公共ODB运行库(LIBODB)中找到的标准C++容器中的一个专门化作为您自己实现的基础。 </p><p class="p">Once the container traits specialization is ready for your container,
+you will need to include it into the ODB compilation process using
+the --odb-epilogue option and into the generated header files with
+the --hxx-prologue option. As an example, suppose we have a hash table
+container for which we have the traits specialization implemented
+in the hashtable-traits.hxx file. Then, we can create an ODB compiler
+options file for this container and save it to hashtable.options: </p><p class="p">容器特性专门化为容器准备好后，需要使用--odb-epilogue选项将其包括到ODB编译过程中，并使用--hxx-prologue选项将其包括到生成的头文件中。例如，假设我们有一个哈希表容器，在哈希表traits中实现了hashtable-traits.hxx文件。然后，我们可以为这个容器创建一个ODB编译器选项文件，并将其保存到哈希表中。选项：</p><p class="p"># Options file for the hash table container.</p><p class="p">#</p><p class="p">--odb-epilogue
+'#include "hashtable-traits.hxx"'</p><p class="p">--hxx-prologue '#include "hashtable-traits.hxx"'</p><p class="p">Now, whenever we compile a header file that uses the hashtable
+container, we can specify the following command line option to make
+sure it is recognized by the ODB compiler as a container and the traits
+file is included in the generated code: </p><p class="p">现在，每当我们编译使用哈希表容器的头文件时，我们都可以指定以下命令行选项，以确保ODB编译器将其识别为容器，并且traits文件包含在生成的代码中：</p><p class="p">--options-file hashtable.options</p></section>
+<section class="section"><h2 class="title sectiontitle">5.1 有序容器</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">5.2 集合和多集合容器</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">5.3 地图和多地图容器</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">5.4 变更跟踪容器</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">5.4.1 变化跟踪向量</h2><p class="p"></p></section>
+<section class="section"><h2 class="title sectiontitle">5.5 使用自定义容器</h2><p class="p"></p></section>
+</div>
+<nav role="navigation" class="related-links"><div class="familylinks"><div class="parentlink"><strong>父主题：</strong> <a class="link" href="../ditas/CPP%E5%BC%80%E5%8F%91%E6%A1%86%E6%9E%B6.html">C++开发框架</a></div></div></nav></article></main></body></html>
